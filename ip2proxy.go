@@ -55,10 +55,17 @@ var asn_position = [9]uint8{0, 0, 0, 0, 0, 0, 0, 9, 9}
 var as_position = [9]uint8{0, 0, 0, 0, 0, 0, 0, 10, 10}
 var lastseen_position = [9]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11}
 
-const module_version string = "2.0.0"
+const module_version string = "2.1.0"
 
 var max_ipv4_range = big.NewInt(4294967295)
 var max_ipv6_range = big.NewInt(0)
+var from_v4mapped = big.NewInt(281470681743360)
+var to_v4mapped = big.NewInt(281474976710655)
+var from_6to4 = big.NewInt(0)
+var to_6to4 = big.NewInt(0)
+var from_teredo = big.NewInt(0)
+var to_teredo = big.NewInt(0)
+var last_32bits = big.NewInt(4294967295)
 
 const countryshort uint32 = 0x00001
 const countrylong uint32 = 0x00002
@@ -124,6 +131,22 @@ func checkip(ip string) (iptype uint32, ipnum *big.Int, ipindex uint32) {
 			if v6 != nil {
 				iptype = 6
 				ipnum.SetBytes(v6)
+				
+				if ipnum.Cmp(from_v4mapped) >= 0 && ipnum.Cmp(to_v4mapped) <= 0 {
+					// ipv4-mapped ipv6 should treat as ipv4 and read ipv4 data section
+					iptype = 4
+					ipnum.Sub(ipnum, from_v4mapped)
+				} else if ipnum.Cmp(from_6to4) >= 0 && ipnum.Cmp(to_6to4) <= 0 {
+					// 6to4 so need to remap to ipv4
+					iptype = 4
+					ipnum.Rsh(ipnum, 80)
+					ipnum.And(ipnum, last_32bits)
+				} else if ipnum.Cmp(from_teredo) >= 0 && ipnum.Cmp(to_teredo) <= 0 {
+					// Teredo so need to remap to ipv4
+					iptype = 4
+					ipnum.Not(ipnum)
+					ipnum.And(ipnum, last_32bits)
+				}
 			}
 		}
 	}
@@ -231,6 +254,10 @@ func Open(dbpath string) int8 {
 	Close() // reset in case user didn't call Close() before calling Open() again
 	
 	max_ipv6_range.SetString("340282366920938463463374607431768211455", 10)
+	from_6to4.SetString("42545680458834377588178886921629466624", 10)
+	to_6to4.SetString("42550872755692912415807417417958686719", 10)
+	from_teredo.SetString("42540488161975842760550356425300246528", 10)
+	to_teredo.SetString("42540488241204005274814694018844196863", 10)
 	
 	var err error
 	f, err = os.Open(dbpath)
@@ -527,7 +554,7 @@ func query(ipaddress string, mode uint32) IP2Proxyrecord {
 	}
 	
 	if ipno.Cmp(maxip)>=0 {
-		ipno = ipno.Sub(ipno, big.NewInt(1))
+		ipno.Sub(ipno, big.NewInt(1))
 	}
 	
 	for low <= high {
