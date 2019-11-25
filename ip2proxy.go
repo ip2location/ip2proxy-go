@@ -5,6 +5,7 @@ import (
 	"os"
 	"bytes"
 	"encoding/binary"
+	"math"
 	"math/big"
 	"strconv"
 	"net"
@@ -55,7 +56,7 @@ var asn_position = [9]uint8{0, 0, 0, 0, 0, 0, 0, 9, 9}
 var as_position = [9]uint8{0, 0, 0, 0, 0, 0, 0, 10, 10}
 var lastseen_position = [9]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11}
 
-const module_version string = "2.1.0"
+const module_version string = "2.2.0"
 
 var max_ipv4_range = big.NewInt(4294967295)
 var max_ipv6_range = big.NewInt(0)
@@ -178,6 +179,14 @@ func readuint8(pos int64) uint8 {
 	return retval
 }
 
+// read unsigned 32-bit integer from slices
+func readuint32_row(row []byte, pos uint32) uint32 {
+	var retval uint32
+	data := row[pos:pos + 4]
+	retval = binary.LittleEndian.Uint32(data)
+	return retval
+}
+
 // read unsigned 32-bit integer
 func readuint32(pos uint32) uint32 {
 	pos2 := int64(pos)
@@ -232,6 +241,15 @@ func readstr(pos uint32) string {
 	return retval
 }
 
+// read float from slices
+func readfloat_row(row []byte, pos uint32) float32 {
+	var retval float32
+	data := row[pos:pos + 4]
+	bits := binary.LittleEndian.Uint32(data)
+	retval = math.Float32frombits(bits)
+	return retval
+}
+
 // read float
 func readfloat(pos uint32) float32 {
 	pos2 := int64(pos)
@@ -282,44 +300,84 @@ func Open(dbpath string) int8 {
 	dbt := meta.databasetype
 	
 	// since both IPv4 and IPv6 use 4 bytes for the below columns, can just do it once here
+	// if country_position[dbt] != 0 {
+		// country_position_offset = uint32(country_position[dbt] - 1) << 2
+		// country_enabled = true
+	// }
+	// if region_position[dbt] != 0 {
+		// region_position_offset = uint32(region_position[dbt] - 1) << 2
+		// region_enabled = true
+	// }
+	// if city_position[dbt] != 0 {
+		// city_position_offset = uint32(city_position[dbt] - 1) << 2
+		// city_enabled = true
+	// }
+	// if isp_position[dbt] != 0 {
+		// isp_position_offset = uint32(isp_position[dbt] - 1) << 2
+		// isp_enabled = true
+	// }
+	// if proxytype_position[dbt] != 0 {
+		// proxytype_position_offset = uint32(proxytype_position[dbt] - 1) << 2
+		// proxytype_enabled = true
+	// }
+	// if domain_position[dbt] != 0 {
+		// domain_position_offset = uint32(domain_position[dbt] - 1) << 2
+		// domain_enabled = true
+	// }
+	// if usagetype_position[dbt] != 0 {
+		// usagetype_position_offset = uint32(usagetype_position[dbt] - 1) << 2
+		// usagetype_enabled = true
+	// }
+	// if asn_position[dbt] != 0 {
+		// asn_position_offset = uint32(asn_position[dbt] - 1) << 2
+		// asn_enabled = true
+	// }
+	// if as_position[dbt] != 0 {
+		// as_position_offset = uint32(as_position[dbt] - 1) << 2
+		// as_enabled = true
+	// }
+	// if lastseen_position[dbt] != 0 {
+		// lastseen_position_offset = uint32(lastseen_position[dbt] - 1) << 2
+		// lastseen_enabled = true
+	// }
 	if country_position[dbt] != 0 {
-		country_position_offset = uint32(country_position[dbt] - 1) << 2
+		country_position_offset = uint32(country_position[dbt] - 2) << 2
 		country_enabled = true
 	}
 	if region_position[dbt] != 0 {
-		region_position_offset = uint32(region_position[dbt] - 1) << 2
+		region_position_offset = uint32(region_position[dbt] - 2) << 2
 		region_enabled = true
 	}
 	if city_position[dbt] != 0 {
-		city_position_offset = uint32(city_position[dbt] - 1) << 2
+		city_position_offset = uint32(city_position[dbt] - 2) << 2
 		city_enabled = true
 	}
 	if isp_position[dbt] != 0 {
-		isp_position_offset = uint32(isp_position[dbt] - 1) << 2
+		isp_position_offset = uint32(isp_position[dbt] - 2) << 2
 		isp_enabled = true
 	}
 	if proxytype_position[dbt] != 0 {
-		proxytype_position_offset = uint32(proxytype_position[dbt] - 1) << 2
+		proxytype_position_offset = uint32(proxytype_position[dbt] - 2) << 2
 		proxytype_enabled = true
 	}
 	if domain_position[dbt] != 0 {
-		domain_position_offset = uint32(domain_position[dbt] - 1) << 2
+		domain_position_offset = uint32(domain_position[dbt] - 2) << 2
 		domain_enabled = true
 	}
 	if usagetype_position[dbt] != 0 {
-		usagetype_position_offset = uint32(usagetype_position[dbt] - 1) << 2
+		usagetype_position_offset = uint32(usagetype_position[dbt] - 2) << 2
 		usagetype_enabled = true
 	}
 	if asn_position[dbt] != 0 {
-		asn_position_offset = uint32(asn_position[dbt] - 1) << 2
+		asn_position_offset = uint32(asn_position[dbt] - 2) << 2
 		asn_enabled = true
 	}
 	if as_position[dbt] != 0 {
-		as_position_offset = uint32(as_position[dbt] - 1) << 2
+		as_position_offset = uint32(as_position[dbt] - 2) << 2
 		as_enabled = true
 	}
 	if lastseen_position[dbt] != 0 {
-		lastseen_position_offset = uint32(lastseen_position[dbt] - 1) << 2
+		lastseen_position_offset = uint32(lastseen_position[dbt] - 2) << 2
 		lastseen_enabled = true
 	}
 	
@@ -571,19 +629,29 @@ func query(ipaddress string, mode uint32) IP2Proxyrecord {
 		}
 		
 		if ipno.Cmp(ipfrom)>=0 && ipno.Cmp(ipto)<0 {
+			var firstcol uint32 = 4 // 4 bytes for ip from
 			if iptype == 6 {
-				rowoffset = rowoffset + 12 // coz below is assuming all columns are 4 bytes, so got 12 left to go to make 16 bytes total
+				firstcol = 16 // 16 bytes for ipv6
+				// rowoffset = rowoffset + 12 // coz below is assuming all columns are 4 bytes, so got 12 left to go to make 16 bytes total
+			}
+			
+			row := make([]byte, colsize - firstcol) // exclude the ip from field
+			_, err := f.ReadAt(row, int64(rowoffset + firstcol - 1))
+			if err != nil {
+				fmt.Println("File read failed:", err)
 			}
 			
 			if proxytype_enabled {
 				if mode&proxytype != 0 || mode&isproxy != 0 {
-					x.Proxy_type = readstr(readuint32(rowoffset + proxytype_position_offset))
+					// x.Proxy_type = readstr(readuint32(rowoffset + proxytype_position_offset))
+					x.Proxy_type = readstr(readuint32_row(row, proxytype_position_offset))
 				}
 			}
 			
 			if country_enabled {
 				if mode&countryshort != 0 || mode&countrylong != 0 || mode&isproxy != 0 {
-					countrypos = readuint32(rowoffset + country_position_offset)
+					// countrypos = readuint32(rowoffset + country_position_offset)
+					countrypos = readuint32_row(row, country_position_offset)
 				}
 				if mode&countryshort != 0 || mode&isproxy != 0 {
 					x.Country_short = readstr(countrypos)
@@ -594,35 +662,43 @@ func query(ipaddress string, mode uint32) IP2Proxyrecord {
 			}
 			
 			if mode&region != 0 && region_enabled {
-				x.Region = readstr(readuint32(rowoffset + region_position_offset))
+				// x.Region = readstr(readuint32(rowoffset + region_position_offset))
+				x.Region = readstr(readuint32_row(row, region_position_offset))
 			}
 			
 			if mode&city != 0 && city_enabled {
-				x.City = readstr(readuint32(rowoffset + city_position_offset))
+				// x.City = readstr(readuint32(rowoffset + city_position_offset))
+				x.City = readstr(readuint32_row(row, city_position_offset))
 			}
 			
 			if mode&isp != 0 && isp_enabled {
-				x.Isp = readstr(readuint32(rowoffset + isp_position_offset))
+				// x.Isp = readstr(readuint32(rowoffset + isp_position_offset))
+				x.Isp = readstr(readuint32_row(row, isp_position_offset))
 			}
 			
 			if mode&domain != 0 && domain_enabled {
-				x.Domain = readstr(readuint32(rowoffset + domain_position_offset))
+				// x.Domain = readstr(readuint32(rowoffset + domain_position_offset))
+				x.Domain = readstr(readuint32_row(row, domain_position_offset))
 			}
 			
 			if mode&usagetype != 0 && usagetype_enabled {
-				x.Usage_type = readstr(readuint32(rowoffset + usagetype_position_offset))
+				// x.Usage_type = readstr(readuint32(rowoffset + usagetype_position_offset))
+				x.Usage_type = readstr(readuint32_row(row, usagetype_position_offset))
 			}
 			
 			if mode&asn != 0 && asn_enabled {
-				x.Asn = readstr(readuint32(rowoffset + asn_position_offset))
+				// x.Asn = readstr(readuint32(rowoffset + asn_position_offset))
+				x.Asn = readstr(readuint32_row(row, asn_position_offset))
 			}
 			
 			if mode&as != 0 && as_enabled {
-				x.As = readstr(readuint32(rowoffset + as_position_offset))
+				// x.As = readstr(readuint32(rowoffset + as_position_offset))
+				x.As = readstr(readuint32_row(row, as_position_offset))
 			}
 			
 			if mode&lastseen != 0 && lastseen_enabled {
-				x.Last_seen = readstr(readuint32(rowoffset + lastseen_position_offset))
+				// x.Last_seen = readstr(readuint32(rowoffset + lastseen_position_offset))
+				x.Last_seen = readstr(readuint32_row(row, lastseen_position_offset))
 			}
 			
 			if x.Country_short == "-" || x.Proxy_type == "-" {
