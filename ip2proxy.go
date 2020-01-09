@@ -1,3 +1,7 @@
+// This ip2proxy package allows user to query an IP address if it was being used as
+// VPN anonymizer, open proxies, web proxies, Tor exits, data center,
+// web hosting (DCH) range and search engine robots (SES)
+// by using the IP2Proxy database.
 package ip2proxy
 
 import (
@@ -27,6 +31,8 @@ type ip2proxymeta struct {
 	ipv6columnsize uint32
 }
 
+// The IP2Proxyrecord struct stores all of the available
+// proxy info found in the IP2Proxy database.
 type IP2Proxyrecord struct {
 	Country_short string
 	Country_long string
@@ -267,7 +273,8 @@ func readfloat(pos uint32) float32 {
 	return retval
 }
 
-// initialize the component with the database path
+// Open takes the path to the IP2Proxy BIN database file. It will read all the metadata required to
+// be able to extract the embedded proxy data.
 func Open(dbpath string) int8 {
 	Close() // reset in case user didn't call Close() before calling Open() again
 	
@@ -385,7 +392,7 @@ func Open(dbpath string) int8 {
 	return 0
 }
 
-// close database file handle & reset
+// Close will close the file handle to the BIN file and reset.
 func Close() int8 {
 	meta.databasetype = 0
 	meta.databasecolumn = 0
@@ -430,17 +437,17 @@ func Close() int8 {
 	}
 }
 
-// get module version
+// ModuleVersion returns the version of the component.
 func ModuleVersion() string {
 	return module_version
 }
 
-// get package version
+// PackageVersion returns the database type.
 func PackageVersion() string {
 	return strconv.Itoa(int(meta.databasetype))
 }
 
-// get database version
+// DatabaseVersion returns the database version.
 func DatabaseVersion() string {
 	return "20" + strconv.Itoa(int(meta.databaseyear)) + "." + strconv.Itoa(int(meta.databasemonth)) + "." + strconv.Itoa(int(meta.databaseday))
 }
@@ -465,7 +472,7 @@ func loadmessage (mesg string) IP2Proxyrecord {
 	return x
 }
 
-// get all fields
+// GetAll will return all proxy fields based on the queried IP address.
 func GetAll(ipaddress string) map[string]string {
 	data := query(ipaddress, all)
 	
@@ -487,73 +494,77 @@ func GetAll(ipaddress string) map[string]string {
 	return x
 }
 
-// get country code
+// GetCountryShort will return the ISO-3166 country code based on the queried IP address.
 func GetCountryShort(ipaddress string) string {
 	data := query(ipaddress, countryshort)
 	return data.Country_short
 }
 
-// get country name
+// GetCountryLong will return the country name based on the queried IP address.
 func GetCountryLong(ipaddress string) string {
 	data := query(ipaddress, countrylong)
 	return data.Country_long
 }
 
-// get region
+// GetRegion will return the region name based on the queried IP address.
 func GetRegion(ipaddress string) string {
 	data := query(ipaddress, region)
 	return data.Region
 }
 
-// get city
+// GetCity will return the city name based on the queried IP address.
 func GetCity(ipaddress string) string {
 	data := query(ipaddress, city)
 	return data.City
 }
 
-// get isp
+// GetIsp will return the Internet Service Provider name based on the queried IP address.
 func GetIsp(ipaddress string) string {
 	data := query(ipaddress, isp)
 	return data.Isp
 }
 
-// get proxy type
+// GetProxyType will return the proxy type based on the queried IP address.
 func GetProxyType(ipaddress string) string {
 	data := query(ipaddress, proxytype)
 	return data.Proxy_type
 }
 
-// get domain
+// GetDomain will return the domain name based on the queried IP address.
 func GetDomain(ipaddress string) string {
 	data := query(ipaddress, domain)
 	return data.Domain
 }
 
-// get usage type
+// GetUsageType will return the usage type based on the queried IP address.
 func GetUsageType(ipaddress string) string {
 	data := query(ipaddress, usagetype)
 	return data.Usage_type
 }
 
-// get asn
+// GetAsn will return the autonomous system number based on the queried IP address.
 func GetAsn(ipaddress string) string {
 	data := query(ipaddress, asn)
 	return data.Asn
 }
 
-// get as
+// GetAs will return the autonomous system name based on the queried IP address.
 func GetAs(ipaddress string) string {
 	data := query(ipaddress, as)
 	return data.As
 }
 
-// get last seen
+// GetLastSeen will return the number of days that the proxy was last seen based on the queried IP address.
 func GetLastSeen(ipaddress string) string {
 	data := query(ipaddress, lastseen)
 	return data.Last_seen
 }
 
-// is proxy
+// IsProxy checks whether the queried IP address was a proxy. Returned value:
+// -1 : errors
+// 0 : not a proxy
+// 1 : a proxy
+// 2 : a data center IP address or search engine robot
 func IsProxy(ipaddress string) int8 {
 	data := query(ipaddress, isproxy)
 	return data.Is_proxy
@@ -723,7 +734,7 @@ func query(ipaddress string, mode uint32) IP2Proxyrecord {
 	return x
 }
 
-// for debugging purposes
+// Printrecord is used to output the proxy data for debugging purposes.
 func Printrecord(x IP2Proxyrecord) {
 	fmt.Printf("country_short: %s\n", x.Country_short)
 	fmt.Printf("country_long: %s\n", x.Country_long)
