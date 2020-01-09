@@ -560,11 +560,7 @@ func GetLastSeen(ipaddress string) string {
 	return data.Last_seen
 }
 
-// IsProxy checks whether the queried IP address was a proxy. Returned value:
-// -1 : errors
-// 0 : not a proxy
-// 1 : a proxy
-// 2 : a data center IP address or search engine robot
+// IsProxy checks whether the queried IP address was a proxy. Returned value: -1 (errors), 0 (not a proxy), 1 (a proxy), 2 (a data center IP address or search engine robot).
 func IsProxy(ipaddress string) int8 {
 	data := query(ipaddress, isproxy)
 	return data.Is_proxy
