@@ -53,44 +53,36 @@ import (
 )
 
 func main() {
-	if ip2proxy.Open("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN.BIN") == 0 {
-		ip := "199.83.103.79"
-		
-		fmt.Printf("ModuleVersion: %s\n", ip2proxy.ModuleVersion())
-		fmt.Printf("PackageVersion: %s\n", ip2proxy.PackageVersion())
-		fmt.Printf("DatabaseVersion: %s\n", ip2proxy.DatabaseVersion())
-		
-		// functions for individual fields
-		fmt.Printf("IsProxy: %d\n", ip2proxy.IsProxy(ip))
-		fmt.Printf("ProxyType: %s\n", ip2proxy.GetProxyType(ip))
-		fmt.Printf("CountryShort: %s\n", ip2proxy.GetCountryShort(ip))
-		fmt.Printf("CountryLong: %s\n", ip2proxy.GetCountryLong(ip))
-		fmt.Printf("Region: %s\n", ip2proxy.GetRegion(ip))
-		fmt.Printf("City: %s\n", ip2proxy.GetCity(ip))
-		fmt.Printf("ISP: %s\n", ip2proxy.GetIsp(ip))
-		fmt.Printf("Domain: %s\n", ip2proxy.GetDomain(ip))
-		fmt.Printf("UsageType: %s\n", ip2proxy.GetUsageType(ip))
-		fmt.Printf("ASN: %s\n", ip2proxy.GetAsn(ip))
-		fmt.Printf("AS: %s\n", ip2proxy.GetAs(ip))
-		fmt.Printf("LastSeen: %s\n", ip2proxy.GetLastSeen(ip))
-		
-		// function for all fields
-		all := ip2proxy.GetAll(ip)
-		fmt.Printf("isProxy: %s\n", all["isProxy"])
-		fmt.Printf("ProxyType: %s\n", all["ProxyType"])
-		fmt.Printf("CountryShort: %s\n", all["CountryShort"])
-		fmt.Printf("CountryLong: %s\n", all["CountryLong"])
-		fmt.Printf("Region: %s\n", all["Region"])
-		fmt.Printf("City: %s\n", all["City"])
-		fmt.Printf("ISP: %s\n", all["ISP"])
-		fmt.Printf("Domain: %s\n", all["Domain"])
-		fmt.Printf("UsageType: %s\n", all["UsageType"])
-		fmt.Printf("ASN: %s\n", all["ASN"])
-		fmt.Printf("AS: %s\n", all["AS"])
-		fmt.Printf("LastSeen: %s\n", all["LastSeen"])
-	} else {
-		fmt.Printf("Error reading BIN file.\n")
+	db, err := ip2proxy.OpenDB("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN.BIN")
+	
+	if err != nil {
+		return
 	}
-	ip2proxy.Close()
+	ip := "199.83.103.79"
+	all, err := db.GetAll(ip)
+	
+	if err != nil {
+		fmt.Print(err)
+		return
+	}
+	
+	fmt.Printf("ModuleVersion: %s\n", ip2proxy.ModuleVersion())
+	fmt.Printf("PackageVersion: %s\n", db.PackageVersion())
+	fmt.Printf("DatabaseVersion: %s\n", db.DatabaseVersion())
+	
+	fmt.Printf("isProxy: %s\n", all["isProxy"])
+	fmt.Printf("ProxyType: %s\n", all["ProxyType"])
+	fmt.Printf("CountryShort: %s\n", all["CountryShort"])
+	fmt.Printf("CountryLong: %s\n", all["CountryLong"])
+	fmt.Printf("Region: %s\n", all["Region"])
+	fmt.Printf("City: %s\n", all["City"])
+	fmt.Printf("ISP: %s\n", all["ISP"])
+	fmt.Printf("Domain: %s\n", all["Domain"])
+	fmt.Printf("UsageType: %s\n", all["UsageType"])
+	fmt.Printf("ASN: %s\n", all["ASN"])
+	fmt.Printf("AS: %s\n", all["AS"])
+	fmt.Printf("LastSeen: %s\n", all["LastSeen"])
+	
+	db.Close()
 }
 ```
