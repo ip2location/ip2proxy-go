@@ -75,7 +75,7 @@ type DB struct {
 	asn_enabled       bool
 	as_enabled        bool
 	lastseen_enabled  bool
-	threat_enabled  bool
+	threat_enabled    bool
 
 	metaok bool
 }
