@@ -1,6 +1,6 @@
 // This ip2proxy package allows user to query an IP address if it was being used as
 // VPN anonymizer, open proxies, web proxies, Tor exits, data center,
-// web hosting (DCH) range and search engine robots (SES)
+// web hosting (DCH) range, search engine robots (SES) and residential (RES)
 // by using the IP2Proxy database.
 package ip2proxy
 
@@ -45,6 +45,7 @@ type IP2Proxyrecord struct {
 	Asn           string
 	As            string
 	Last_seen     string
+	Threat        string
 	Is_proxy      int8
 }
 
@@ -62,6 +63,7 @@ type DB struct {
 	asn_position_offset       uint32
 	as_position_offset        uint32
 	lastseen_position_offset  uint32
+	threat_position_offset    uint32
 
 	country_enabled   bool
 	region_enabled    bool
@@ -73,24 +75,26 @@ type DB struct {
 	asn_enabled       bool
 	as_enabled        bool
 	lastseen_enabled  bool
+	threat_enabled  bool
 
 	metaok bool
 }
 
 var defaultDB = &DB{}
 
-var country_position = [9]uint8{0, 2, 3, 3, 3, 3, 3, 3, 3}
-var region_position = [9]uint8{0, 0, 0, 4, 4, 4, 4, 4, 4}
-var city_position = [9]uint8{0, 0, 0, 5, 5, 5, 5, 5, 5}
-var isp_position = [9]uint8{0, 0, 0, 0, 6, 6, 6, 6, 6}
-var proxytype_position = [9]uint8{0, 0, 2, 2, 2, 2, 2, 2, 2}
-var domain_position = [9]uint8{0, 0, 0, 0, 0, 7, 7, 7, 7}
-var usagetype_position = [9]uint8{0, 0, 0, 0, 0, 0, 8, 8, 8}
-var asn_position = [9]uint8{0, 0, 0, 0, 0, 0, 0, 9, 9}
-var as_position = [9]uint8{0, 0, 0, 0, 0, 0, 0, 10, 10}
-var lastseen_position = [9]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11}
+var country_position = [11]uint8{0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3}
+var region_position = [11]uint8{0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4}
+var city_position = [11]uint8{0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 5}
+var isp_position = [11]uint8{0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6}
+var proxytype_position = [11]uint8{0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2}
+var domain_position = [11]uint8{0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7}
+var usagetype_position = [11]uint8{0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8}
+var asn_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9}
+var as_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10}
+var lastseen_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11}
+var threat_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12}
 
-const module_version string = "2.3.0"
+const module_version string = "2.4.0"
 
 var max_ipv4_range = big.NewInt(4294967295)
 var max_ipv6_range = big.NewInt(0)
@@ -114,8 +118,9 @@ const usagetype uint32 = 0x00100
 const asn uint32 = 0x00200
 const as uint32 = 0x00400
 const lastseen uint32 = 0x00800
+const threat uint32 = 0x01000
 
-const all uint32 = countryshort | countrylong | region | city | isp | proxytype | isproxy | domain | usagetype | asn | as | lastseen
+const all uint32 = countryshort | countrylong | region | city | isp | proxytype | isproxy | domain | usagetype | asn | as | lastseen | threat
 
 const msg_not_supported string = "NOT SUPPORTED"
 const msg_invalid_ip string = "INVALID IP ADDRESS"
@@ -388,6 +393,10 @@ func OpenDB(dbpath string) (*DB, error) {
 		db.lastseen_position_offset = uint32(lastseen_position[dbt]-2) << 2
 		db.lastseen_enabled = true
 	}
+	if threat_position[dbt] != 0 {
+		db.threat_position_offset = uint32(threat_position[dbt]-2) << 2
+		db.threat_enabled = true
+	}
 
 	db.metaok = true
 
@@ -499,6 +508,7 @@ func loadmessage(mesg string) IP2Proxyrecord {
 	x.Asn = mesg
 	x.As = mesg
 	x.Last_seen = mesg
+	x.Threat = mesg
 	x.Is_proxy = -1
 
 	return x
@@ -649,6 +659,7 @@ func (d *DB) GetAll(ipaddress string) (map[string]string, error) {
 	x["ASN"] = data.Asn
 	x["AS"] = data.As
 	x["LastSeen"] = data.Last_seen
+	x["Threat"] = data.Threat
 
 	return x, err
 }
@@ -701,22 +712,28 @@ func (d *DB) GetUsageType(ipaddress string) (string, error) {
 	return data.Usage_type, err
 }
 
-// GetAsn will return the autonomous system number based on the queried IP address., err
+// GetAsn will return the autonomous system number based on the queried IP address.
 func (d *DB) GetAsn(ipaddress string) (string, error) {
 	data, err := d.query(ipaddress, asn)
 	return data.Asn, err
 }
 
-// GetAs will return the autonomous system name based on the queried IP address., err
+// GetAs will return the autonomous system name based on the queried IP address.
 func (d *DB) GetAs(ipaddress string) (string, error) {
 	data, err := d.query(ipaddress, as)
 	return data.As, err
 }
 
-// GetLastSeen will return the number of days that the proxy was last seen based on the queried IP address., err
+// GetLastSeen will return the number of days that the proxy was last seen based on the queried IP address.
 func (d *DB) GetLastSeen(ipaddress string) (string, error) {
 	data, err := d.query(ipaddress, lastseen)
 	return data.Last_seen, err
+}
+
+// GetThreat will return the threat type of the proxy.
+func (d *DB) GetThreat(ipaddress string) (string, error) {
+	data, err := d.query(ipaddress, threat)
+	return data.Threat, err
 }
 
 // IsProxy checks whether the queried IP address was a proxy. Returned value: -1 (errors), 0 (not a proxy), 1 (a proxy), 2 (a data center IP address or search engine robot).
@@ -924,6 +941,14 @@ func (d *DB) query(ipaddress string, mode uint32) (IP2Proxyrecord, error) {
 				}
 			}
 
+			if mode&threat != 0 && d.threat_enabled {
+				// x.Threat = readstr(readuint32(rowoffset + threat_position_offset))
+				// x.Threat = readstr(readuint32_row(row, threat_position_offset))
+				if x.Threat, err = d.readstr(d.readuint32_row(row, d.threat_position_offset)); err != nil {
+					return x, err
+				}
+			}
+
 			if x.Country_short == "-" || x.Proxy_type == "-" {
 				x.Is_proxy = 0
 			} else {
@@ -964,5 +989,6 @@ func Printrecord(x IP2Proxyrecord) {
 	fmt.Printf("asn: %s\n", x.Asn)
 	fmt.Printf("as: %s\n", x.As)
 	fmt.Printf("last_seen: %s\n", x.Last_seen)
+	fmt.Printf("threat: %s\n", x.Threat)
 	fmt.Printf("is_proxy: %d\n", x.Is_proxy)
 }
