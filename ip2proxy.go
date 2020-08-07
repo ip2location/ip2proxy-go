@@ -94,7 +94,7 @@ var as_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10}
 var lastseen_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11}
 var threat_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12}
 
-const module_version string = "2.4.0"
+const module_version string = "3.0.0"
 
 var max_ipv4_range = big.NewInt(4294967295)
 var max_ipv6_range = big.NewInt(0)
