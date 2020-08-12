@@ -8,12 +8,18 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 	"net"
 	"os"
 	"strconv"
 )
+
+type DBReader interface {
+	io.ReadCloser
+	io.ReaderAt
+}
 
 type ip2proxymeta struct {
 	databasetype      uint8
@@ -50,7 +56,7 @@ type IP2Proxyrecord struct {
 }
 
 type DB struct {
-	f    *os.File
+	f    DBReader
 	meta ip2proxymeta
 
 	country_position_offset   uint32
@@ -94,7 +100,7 @@ var as_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10}
 var lastseen_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11}
 var threat_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12}
 
-const module_version string = "3.0.0"
+const module_version string = "3.1.0"
 
 var max_ipv4_range = big.NewInt(4294967295)
 var max_ipv6_range = big.NewInt(0)
@@ -290,6 +296,17 @@ func fatal(db *DB, err error) (*DB, error) {
 // OpenDB takes the path to the IP2Proxy BIN database file. It will read all the metadata required to
 // be able to extract the embedded proxy data, and return the underlining DB object.
 func OpenDB(dbpath string) (*DB, error) {
+	f, err := os.Open(dbpath)
+	if err != nil {
+		return nil, err
+	}
+
+	return OpenDBWithReader(f)
+}
+
+// OpenDBWithReader takes a DBReader to the IP2Proxy BIN database file. It will read all the metadata required to
+// be able to extract the embedded proxy data, and return the underlining DB object.
+func OpenDBWithReader(reader DBReader) (*DB, error) {
 	var db = &DB{}
 
 	max_ipv6_range.SetString("340282366920938463463374607431768211455", 10)
@@ -298,12 +315,9 @@ func OpenDB(dbpath string) (*DB, error) {
 	from_teredo.SetString("42540488161975842760550356425300246528", 10)
 	to_teredo.SetString("42540488241204005274814694018844196863", 10)
 
-	var err error
-	db.f, err = os.Open(dbpath)
-	if err != nil {
-		return nil, err
-	}
+	db.f = reader
 
+	var err error
 	db.meta.databasetype, err = db.readuint8(1)
 	if err != nil {
 		return fatal(db, err)
