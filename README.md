@@ -25,7 +25,7 @@ Below are the methods supported in this package.
 |---|---|
 |Open|Open the IP2Proxy BIN data for lookup.|
 |Close|Close and clean up the file pointer.|
-|PackageVersion|Get the package version (1 to 10 for PX1 to PX10 respectively).|
+|PackageVersion|Get the package version (1 to 11 for PX1 to PX11 respectively).|
 |ModuleVersion|Get the module version.|
 |DatabaseVersion|Get the database version.|
 |IsProxy|Check whether if an IP address was a proxy. Returned value:<ul><li>-1 : errors</li><li>0 : not a proxy</li><li>1 : a proxy</li><li>2 : a data center IP address or search engine robot</li></ul>|
