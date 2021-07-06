@@ -42,6 +42,7 @@ Below are the methods supported in this package.
 |GetAs|Return the autonomous system name of the proxy.|
 |GetLastSeen|Return the number of days that the proxy was last seen.|
 |GetThreat|Return the threat type of the proxy.|
+|GetProvider|Return the provider of the proxy.|
 
 ## Usage
 
@@ -54,7 +55,7 @@ import (
 )
 
 func main() {
-	db, err := ip2proxy.OpenDB("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL.BIN")
+	db, err := ip2proxy.OpenDB("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.BIN")
 	
 	if err != nil {
 		return
@@ -84,6 +85,7 @@ func main() {
 	fmt.Printf("AS: %s\n", all["AS"])
 	fmt.Printf("LastSeen: %s\n", all["LastSeen"])
 	fmt.Printf("Threat: %s\n", all["Threat"])
+	fmt.Printf("Provider: %s\n", all["Provider"])
 	
 	db.Close()
 }

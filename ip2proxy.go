@@ -7,9 +7,9 @@ package ip2proxy
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
-	"math"
 	"math/big"
 	"net"
 	"os"
@@ -35,6 +35,9 @@ type ip2proxymeta struct {
 	ipv6indexbaseaddr uint32
 	ipv4columnsize    uint32
 	ipv6columnsize    uint32
+	productcode       uint8
+	producttype       uint8
+	filesize          uint32
 }
 
 // The IP2Proxyrecord struct stores all of the available
@@ -52,6 +55,7 @@ type IP2Proxyrecord struct {
 	As            string
 	Last_seen     string
 	Threat        string
+	Provider      string
 	Is_proxy      int8
 }
 
@@ -70,6 +74,7 @@ type DB struct {
 	as_position_offset        uint32
 	lastseen_position_offset  uint32
 	threat_position_offset    uint32
+	provider_position_offset  uint32
 
 	country_enabled   bool
 	region_enabled    bool
@@ -82,25 +87,27 @@ type DB struct {
 	as_enabled        bool
 	lastseen_enabled  bool
 	threat_enabled    bool
+	provider_enabled  bool
 
 	metaok bool
 }
 
 var defaultDB = &DB{}
 
-var country_position = [11]uint8{0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3}
-var region_position = [11]uint8{0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4}
-var city_position = [11]uint8{0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 5}
-var isp_position = [11]uint8{0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6}
-var proxytype_position = [11]uint8{0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2}
-var domain_position = [11]uint8{0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7}
-var usagetype_position = [11]uint8{0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8}
-var asn_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9}
-var as_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10}
-var lastseen_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11}
-var threat_position = [11]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12}
+var country_position = [12]uint8{0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3}
+var region_position = [12]uint8{0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 4}
+var city_position = [12]uint8{0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 5, 5}
+var isp_position = [12]uint8{0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6, 6}
+var proxytype_position = [12]uint8{0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}
+var domain_position = [12]uint8{0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7}
+var usagetype_position = [12]uint8{0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8}
+var asn_position = [12]uint8{0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9}
+var as_position = [12]uint8{0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10}
+var lastseen_position = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11}
+var threat_position = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12}
+var provider_position = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13}
 
-const module_version string = "3.1.0"
+const module_version string = "3.2.0"
 
 var max_ipv4_range = big.NewInt(4294967295)
 var max_ipv6_range = big.NewInt(0)
@@ -125,13 +132,15 @@ const asn uint32 = 0x00200
 const as uint32 = 0x00400
 const lastseen uint32 = 0x00800
 const threat uint32 = 0x01000
+const provider uint32 = 0x02000
 
-const all uint32 = countryshort | countrylong | region | city | isp | proxytype | isproxy | domain | usagetype | asn | as | lastseen | threat
+const all uint32 = countryshort | countrylong | region | city | isp | proxytype | isproxy | domain | usagetype | asn | as | lastseen | threat | provider
 
 const msg_not_supported string = "NOT SUPPORTED"
 const msg_invalid_ip string = "INVALID IP ADDRESS"
 const msg_missing_file string = "MISSING FILE"
 const msg_ipv6_unsupported string = "IPV6 ADDRESS MISSING IN IPV4 BIN"
+const msg_invalid_bin string = "Incorrect IP2Proxy BIN file format. Please make sure that you are using the latest IP2Proxy BIN file."
 
 // get IP type and calculate IP number; calculates index too if exists
 func (d *DB) checkip(ip string) (iptype uint32, ipnum *big.Int, ipindex uint32) {
@@ -262,32 +271,6 @@ func (d *DB) readstr(pos uint32) (string, error) {
 	return retval, nil
 }
 
-// read float from slices
-func (d *DB) readfloat_row(row []byte, pos uint32) float32 {
-	var retval float32
-	data := row[pos : pos+4]
-	bits := binary.LittleEndian.Uint32(data)
-	retval = math.Float32frombits(bits)
-	return retval
-}
-
-// read float
-func (d *DB) readfloat(pos uint32) (float32, error) {
-	pos2 := int64(pos)
-	var retval float32
-	data := make([]byte, 4)
-	_, err := d.f.ReadAt(data, pos2-1)
-	if err != nil {
-		return 0, err
-	}
-	buf := bytes.NewReader(data)
-	err = binary.Read(buf, binary.LittleEndian, &retval)
-	if err != nil {
-		fmt.Printf("binary read failed: %v", err)
-	}
-	return retval, nil
-}
-
 func fatal(db *DB, err error) (*DB, error) {
 	_ = db.f.Close()
 	return nil, err
@@ -362,6 +345,22 @@ func OpenDBWithReader(reader DBReader) (*DB, error) {
 	if err != nil {
 		return fatal(db, err)
 	}
+	db.meta.productcode, err = db.readuint8(30)
+	if err != nil {
+		return fatal(db, err)
+	}
+	db.meta.producttype, err = db.readuint8(31)
+	if err != nil {
+		return fatal(db, err)
+	}
+	db.meta.filesize, err = db.readuint32(32)
+	if err != nil {
+		return fatal(db, err)
+	}
+	// check if is correct BIN (should be 2 for IP2Proxy BIN file), also checking for zipped file (PK being the first 2 chars)
+	if (db.meta.productcode != 2 && db.meta.databaseyear >= 21) || (db.meta.databasetype == 80 && db.meta.databasecolumn == 75) { // only BINs from Jan 2021 onwards have this byte set
+		return fatal(db, errors.New(msg_invalid_bin))
+	}
 	db.meta.ipv4columnsize = uint32(db.meta.databasecolumn << 2)              // 4 bytes each column
 	db.meta.ipv6columnsize = uint32(16 + ((db.meta.databasecolumn - 1) << 2)) // 4 bytes each column, except IPFrom column which is 16 bytes
 
@@ -410,6 +409,10 @@ func OpenDBWithReader(reader DBReader) (*DB, error) {
 	if threat_position[dbt] != 0 {
 		db.threat_position_offset = uint32(threat_position[dbt]-2) << 2
 		db.threat_enabled = true
+	}
+	if provider_position[dbt] != 0 {
+		db.provider_position_offset = uint32(provider_position[dbt]-2) << 2
+		db.provider_enabled = true
 	}
 
 	db.metaok = true
@@ -523,6 +526,7 @@ func loadmessage(mesg string) IP2Proxyrecord {
 	x.As = mesg
 	x.Last_seen = mesg
 	x.Threat = mesg
+	x.Provider = mesg
 	x.Is_proxy = -1
 
 	return x
@@ -674,6 +678,7 @@ func (d *DB) GetAll(ipaddress string) (map[string]string, error) {
 	x["AS"] = data.As
 	x["LastSeen"] = data.Last_seen
 	x["Threat"] = data.Threat
+	x["Provider"] = data.Provider
 
 	return x, err
 }
@@ -748,6 +753,12 @@ func (d *DB) GetLastSeen(ipaddress string) (string, error) {
 func (d *DB) GetThreat(ipaddress string) (string, error) {
 	data, err := d.query(ipaddress, threat)
 	return data.Threat, err
+}
+
+// GetProvider will return the provider of the proxy.
+func (d *DB) GetProvider(ipaddress string) (string, error) {
+	data, err := d.query(ipaddress, provider)
+	return data.Provider, err
 }
 
 // IsProxy checks whether the queried IP address was a proxy. Returned value: -1 (errors), 0 (not a proxy), 1 (a proxy), 2 (a data center IP address or search engine robot).
@@ -852,7 +863,6 @@ func (d *DB) query(ipaddress string, mode uint32) (IP2Proxyrecord, error) {
 			var firstcol uint32 = 4 // 4 bytes for ip from
 			if iptype == 6 {
 				firstcol = 16 // 16 bytes for ipv6
-				// rowoffset = rowoffset + 12 // coz below is assuming all columns are 4 bytes, so got 12 left to go to make 16 bytes total
 			}
 
 			row := make([]byte, colsize-firstcol) // exclude the ip from field
@@ -863,8 +873,6 @@ func (d *DB) query(ipaddress string, mode uint32) (IP2Proxyrecord, error) {
 
 			if d.proxytype_enabled {
 				if mode&proxytype != 0 || mode&isproxy != 0 {
-					// x.Proxy_type = readstr(readuint32(rowoffset + proxytype_position_offset))
-					// x.Proxy_type = readstr(readuint32_row(row, proxytype_position_offset))
 					if x.Proxy_type, err = d.readstr(d.readuint32_row(row, d.proxytype_position_offset)); err != nil {
 						return x, err
 					}
@@ -873,18 +881,14 @@ func (d *DB) query(ipaddress string, mode uint32) (IP2Proxyrecord, error) {
 
 			if d.country_enabled {
 				if mode&countryshort != 0 || mode&countrylong != 0 || mode&isproxy != 0 {
-					// countrypos = readuint32(rowoffset + country_position_offset)
-					// countrypos = readuint32_row(row, country_position_offset)
 					countrypos = d.readuint32_row(row, d.country_position_offset)
 				}
 				if mode&countryshort != 0 || mode&isproxy != 0 {
-					// x.Country_short = readstr(countrypos)
 					if x.Country_short, err = d.readstr(countrypos); err != nil {
 						return x, err
 					}
 				}
 				if mode&countrylong != 0 {
-					// x.Country_long = readstr(countrypos + 3)
 					if x.Country_long, err = d.readstr(countrypos + 3); err != nil {
 						return x, err
 					}
@@ -892,73 +896,61 @@ func (d *DB) query(ipaddress string, mode uint32) (IP2Proxyrecord, error) {
 			}
 
 			if mode&region != 0 && d.region_enabled {
-				// x.Region = readstr(readuint32(rowoffset + region_position_offset))
-				// x.Region = readstr(readuint32_row(row, region_position_offset))
 				if x.Region, err = d.readstr(d.readuint32_row(row, d.region_position_offset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&city != 0 && d.city_enabled {
-				// x.City = readstr(readuint32(rowoffset + city_position_offset))
-				// x.City = readstr(readuint32_row(row, city_position_offset))
 				if x.City, err = d.readstr(d.readuint32_row(row, d.city_position_offset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&isp != 0 && d.isp_enabled {
-				// x.Isp = readstr(readuint32(rowoffset + isp_position_offset))
-				// x.Isp = readstr(readuint32_row(row, isp_position_offset))
 				if x.Isp, err = d.readstr(d.readuint32_row(row, d.isp_position_offset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&domain != 0 && d.domain_enabled {
-				// x.Domain = readstr(readuint32(rowoffset + domain_position_offset))
-				// x.Domain = readstr(readuint32_row(row, domain_position_offset))
 				if x.Domain, err = d.readstr(d.readuint32_row(row, d.domain_position_offset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&usagetype != 0 && d.usagetype_enabled {
-				// x.Usage_type = readstr(readuint32(rowoffset + usagetype_position_offset))
-				// x.Usage_type = readstr(readuint32_row(row, usagetype_position_offset))
 				if x.Usage_type, err = d.readstr(d.readuint32_row(row, d.usagetype_position_offset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&asn != 0 && d.asn_enabled {
-				// x.Asn = readstr(readuint32(rowoffset + asn_position_offset))
-				// x.Asn = readstr(readuint32_row(row, asn_position_offset))
 				if x.Asn, err = d.readstr(d.readuint32_row(row, d.asn_position_offset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&as != 0 && d.as_enabled {
-				// x.As = readstr(readuint32(rowoffset + as_position_offset))
-				// x.As = readstr(readuint32_row(row, as_position_offset))
 				if x.As, err = d.readstr(d.readuint32_row(row, d.as_position_offset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&lastseen != 0 && d.lastseen_enabled {
-				// x.Last_seen = readstr(readuint32(rowoffset + lastseen_position_offset))
-				// x.Last_seen = readstr(readuint32_row(row, lastseen_position_offset))
 				if x.Last_seen, err = d.readstr(d.readuint32_row(row, d.lastseen_position_offset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&threat != 0 && d.threat_enabled {
-				// x.Threat = readstr(readuint32(rowoffset + threat_position_offset))
-				// x.Threat = readstr(readuint32_row(row, threat_position_offset))
 				if x.Threat, err = d.readstr(d.readuint32_row(row, d.threat_position_offset)); err != nil {
+					return x, err
+				}
+			}
+
+			if mode&provider != 0 && d.provider_enabled {
+				if x.Provider, err = d.readstr(d.readuint32_row(row, d.provider_position_offset)); err != nil {
 					return x, err
 				}
 			}
@@ -1004,5 +996,6 @@ func Printrecord(x IP2Proxyrecord) {
 	fmt.Printf("as: %s\n", x.As)
 	fmt.Printf("last_seen: %s\n", x.Last_seen)
 	fmt.Printf("threat: %s\n", x.Threat)
+	fmt.Printf("provider: %s\n", x.Provider)
 	fmt.Printf("is_proxy: %d\n", x.Is_proxy)
 }
