@@ -46,17 +46,17 @@ type ip2proxyMeta struct {
 type ip2proxyRecord struct {
 	countryShort string
 	countryLong  string
-	region        string
-	city          string
-	isp           string
+	region       string
+	city         string
+	isp          string
 	proxyType    string
-	domain        string
+	domain       string
 	usageType    string
-	asn           string
-	as            string
+	asn          string
+	as           string
 	lastSeen     string
-	threat        string
-	provider      string
+	threat       string
+	provider     string
 	isProxy      int8
 }
 
