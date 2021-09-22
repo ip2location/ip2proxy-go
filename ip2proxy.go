@@ -107,7 +107,7 @@ var lastseen_position = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11}
 var threat_position = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12}
 var provider_position = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13}
 
-const module_version string = "3.2.0"
+const module_version string = "3.3.0"
 
 var max_ipv4_range = big.NewInt(4294967295)
 var max_ipv6_range = big.NewInt(0)

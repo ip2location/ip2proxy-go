@@ -7,6 +7,9 @@ This package allows user to query an IP address if it was being used as VPN anon
 * Free IP2Proxy BIN Data: https://lite.ip2location.com
 * Commercial IP2Proxy BIN Data: https://www.ip2location.com/database/ip2proxy
 
+As an alternative, this package can also call the IP2Proxy Web Service. This requires an API key. If you don't have an existing API key, you can subscribe for one at the below:
+
+https://www.ip2location.com/web-service/ip2proxy
 
 ## Installation
 
@@ -18,12 +21,14 @@ go get github.com/ip2location/ip2proxy-go
 
 ```
 
+## QUERY USING THE BIN FILE
+
 ## Methods
 Below are the methods supported in this package.
 
 |Method Name|Description|
 |---|---|
-|Open|Open the IP2Proxy BIN data for lookup.|
+|OpenDB|Open the IP2Proxy BIN data for lookup.|
 |Close|Close and clean up the file pointer.|
 |PackageVersion|Get the package version (1 to 11 for PX1 to PX11 respectively).|
 |ModuleVersion|Get the module version.|
@@ -88,5 +93,73 @@ func main() {
 	fmt.Printf("Provider: %s\n", all["Provider"])
 	
 	db.Close()
+}
+```
+
+## QUERY USING THE IP2PROXY PROXY DETECTION WEB SERVICE
+
+## Methods
+Below are the methods supported in this class.
+
+|Method Name|Description|
+|---|---|
+|OpenWS(apikey string, apipackage string, usessl bool)| Expects 3 input parameters:<ol><li>IP2Proxy API Key.</li><li>Package (PX1 - PX11)</li></li><li>Use HTTPS or HTTP</li></ol> |
+|LookUp(ipAddress string)|Query IP address. This method returns a struct containing the proxy info. <ul><li>CountryCode</li><li>CountryName</li><li>RegionName</li><li>CityName</li><li>ISP</li><li>Domain</li><li>UsageType</li><li>ASN</li><li>AS</li><li>LastSeen</li><li>Threat</li><li>ProxyType</li><li>IsProxy</li><li>Provider</li><ul>|
+|GetCredit()|This method returns the web service credit balance in a struct.|
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/ip2location/ip2proxy-go"
+)
+
+func main() {
+	apikey := "YOUR_API_KEY"
+	apipackage := "PX11"
+	usessl := true
+
+	ws, err := ip2proxy.OpenWS(apikey, apipackage, usessl)
+
+	if err != nil {
+		fmt.Print(err)
+		return
+	}
+	ip := "8.8.8.8"
+	res, err := ws.LookUp(ip)
+
+	if err != nil {
+		fmt.Print(err)
+		return
+	}
+
+	if res.Response != "OK" {
+		fmt.Printf("Error: %s\n", res.Response)
+	} else {
+		fmt.Printf("IsProxy: %s\n", res.IsProxy)
+		fmt.Printf("ProxyType: %s\n", res.ProxyType)
+		fmt.Printf("CountryCode: %s\n", res.CountryCode)
+		fmt.Printf("CountryName: %s\n", res.CountryName)
+		fmt.Printf("RegionName: %s\n", res.RegionName)
+		fmt.Printf("CityName: %s\n", res.CityName)
+		fmt.Printf("ISP: %s\n", res.ISP)
+		fmt.Printf("Domain: %s\n", res.Domain)
+		fmt.Printf("UsageType: %s\n", res.UsageType)
+		fmt.Printf("ASN: %s\n", res.ASN)
+		fmt.Printf("AS: %s\n", res.AS)
+		fmt.Printf("LastSeen: %s\n", res.LastSeen)
+		fmt.Printf("Threat: %s\n", res.Threat)
+		fmt.Printf("Provider: %s\n", res.Provider)
+	}
+
+	res2, err := ws.GetCredit()
+
+	if err != nil {
+		fmt.Print(err)
+		return
+	}
+	
+	fmt.Printf("Credit Balance: %s\n", res2.Response)
 }
 ```
