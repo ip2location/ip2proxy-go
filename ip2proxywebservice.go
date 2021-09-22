@@ -36,6 +36,7 @@ type IP2ProxyCreditResult struct {
 	Response string `json:"response"`
 }
 
+// The WS struct is the main object used to query the IP2Proxy Web Service.
 type WS struct {
 	apiKey     string
 	apiPackage string
