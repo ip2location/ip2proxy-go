@@ -478,9 +478,8 @@ func Close() int8 {
 
 	if err != nil {
 		return -1
-	} else {
-		return 0
 	}
+	return 0
 }
 
 // ModuleVersion returns the version of the component.
