@@ -109,7 +109,7 @@ var lastSeenPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11}
 var threatPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12}
 var providerPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13}
 
-const moduleVersion string = "3.3.1"
+const moduleVersion string = "3.3.2"
 
 var maxIPV4Range = big.NewInt(4294967295)
 var maxIPV6Range = big.NewInt(0)
