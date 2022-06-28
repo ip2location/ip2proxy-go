@@ -32,6 +32,8 @@ type ip2proxyMeta struct {
 	ipV4DatabaseAddr  uint32
 	ipV6DatabaseCount uint32
 	ipV6DatabaseAddr  uint32
+	ipV4Indexed       bool
+	ipV6Indexed       bool
 	ipV4IndexBaseAddr uint32
 	ipV6IndexBaseAddr uint32
 	ipV4ColumnSize    uint32
@@ -109,7 +111,7 @@ var lastSeenPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11}
 var threatPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12}
 var providerPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13}
 
-const moduleVersion string = "3.3.2"
+const moduleVersion string = "3.4.0"
 
 var maxIPV4Range = big.NewInt(4294967295)
 var maxIPV6Range = big.NewInt(0)
@@ -184,13 +186,13 @@ func (d *DB) checkIP(ip string) (ipType uint32, ipNum *big.Int, ipIndex uint32) 
 		}
 	}
 	if ipType == 4 {
-		if d.meta.ipV4IndexBaseAddr > 0 {
+		if d.meta.ipV4Indexed {
 			ipNumTmp.Rsh(ipNum, 16)
 			ipNumTmp.Lsh(ipNumTmp, 3)
 			ipIndex = uint32(ipNumTmp.Add(ipNumTmp, big.NewInt(int64(d.meta.ipV4IndexBaseAddr))).Uint64())
 		}
 	} else if ipType == 6 {
-		if d.meta.ipV6IndexBaseAddr > 0 {
+		if d.meta.ipV6Indexed {
 			ipNumTmp.Rsh(ipNum, 112)
 			ipNumTmp.Lsh(ipNumTmp, 3)
 			ipIndex = uint32(ipNumTmp.Add(ipNumTmp, big.NewInt(int64(d.meta.ipV6IndexBaseAddr))).Uint64())
@@ -209,6 +211,17 @@ func (d *DB) readUint8(pos int64) (uint8, error) {
 	}
 	retVal = data[0]
 	return retVal, nil
+}
+
+// read row
+func (d *DB) readRow(pos uint32, size uint32) ([]byte, error) {
+	pos2 := int64(pos)
+	data := make([]byte, size)
+	_, err := d.f.ReadAt(data, pos2-1)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 // read unsigned 32-bit integer from slices
@@ -236,6 +249,19 @@ func (d *DB) readUint32(pos uint32) (uint32, error) {
 	return retVal, nil
 }
 
+// read unsigned 128-bit integer from slices
+func (d *DB) readUint128Row(row []byte, pos uint32) *big.Int {
+	retVal := big.NewInt(0)
+	data := row[pos : pos+16]
+
+	// little endian to big endian
+	for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
+		data[i], data[j] = data[j], data[i]
+	}
+	retVal.SetBytes(data)
+	return retVal
+}
+
 // read unsigned 128-bit integer
 func (d *DB) readUint128(pos uint32) (*big.Int, error) {
 	pos2 := int64(pos)
@@ -257,19 +283,15 @@ func (d *DB) readUint128(pos uint32) (*big.Int, error) {
 // read string
 func (d *DB) readStr(pos uint32) (string, error) {
 	pos2 := int64(pos)
+	readLen := 256 // max size of string field + 1 byte for the length
 	var retVal string
-	lenByte := make([]byte, 1)
-	_, err := d.f.ReadAt(lenByte, pos2)
+	data := make([]byte, readLen)
+	_, err := d.f.ReadAt(data, pos2)
 	if err != nil {
 		return "", err
 	}
-	strLen := lenByte[0]
-	data := make([]byte, strLen)
-	_, err = d.f.ReadAt(data, pos2+1)
-	if err != nil {
-		return "", err
-	}
-	retVal = string(data[:strLen])
+	strLen := data[0]
+	retVal = string(data[1:(strLen + 1)])
 	return retVal, nil
 }
 
@@ -302,67 +324,42 @@ func OpenDBWithReader(reader dbReader) (*DB, error) {
 
 	db.f = reader
 
+	var row []byte
 	var err error
-	db.meta.databaseType, err = db.readUint8(1)
+	readLen := uint32(64) // 64-byte header
+
+	row, err = db.readRow(1, readLen)
 	if err != nil {
 		return fatal(db, err)
 	}
-	db.meta.databaseColumn, err = db.readUint8(2)
-	if err != nil {
-		return fatal(db, err)
-	}
-	db.meta.databaseYear, err = db.readUint8(3)
-	if err != nil {
-		return fatal(db, err)
-	}
-	db.meta.databaseMonth, err = db.readUint8(4)
-	if err != nil {
-		return fatal(db, err)
-	}
-	db.meta.databaseDay, err = db.readUint8(5)
-	if err != nil {
-		return fatal(db, err)
-	}
-	db.meta.ipV4DatabaseCount, err = db.readUint32(6)
-	if err != nil {
-		return fatal(db, err)
-	}
-	db.meta.ipV4DatabaseAddr, err = db.readUint32(10)
-	if err != nil {
-		return fatal(db, err)
-	}
-	db.meta.ipV6DatabaseCount, err = db.readUint32(14)
-	if err != nil {
-		return fatal(db, err)
-	}
-	db.meta.ipV6DatabaseAddr, err = db.readUint32(18)
-	if err != nil {
-		return fatal(db, err)
-	}
-	db.meta.ipV4IndexBaseAddr, err = db.readUint32(22)
-	if err != nil {
-		return fatal(db, err)
-	}
-	db.meta.ipV6IndexBaseAddr, err = db.readUint32(26)
-	if err != nil {
-		return fatal(db, err)
-	}
-	db.meta.productCode, err = db.readUint8(30)
-	if err != nil {
-		return fatal(db, err)
-	}
-	db.meta.productType, err = db.readUint8(31)
-	if err != nil {
-		return fatal(db, err)
-	}
-	db.meta.fileSize, err = db.readUint32(32)
-	if err != nil {
-		return fatal(db, err)
-	}
+	db.meta.databaseType = row[0]
+	db.meta.databaseColumn = row[1]
+	db.meta.databaseYear = row[2]
+	db.meta.databaseMonth = row[3]
+	db.meta.databaseDay = row[4]
+	db.meta.ipV4DatabaseCount = db.readUint32Row(row, 5)
+	db.meta.ipV4DatabaseAddr = db.readUint32Row(row, 9)
+	db.meta.ipV6DatabaseCount = db.readUint32Row(row, 13)
+	db.meta.ipV6DatabaseAddr = db.readUint32Row(row, 17)
+	db.meta.ipV4IndexBaseAddr = db.readUint32Row(row, 21)
+	db.meta.ipV6IndexBaseAddr = db.readUint32Row(row, 25)
+	db.meta.productCode = row[29]
+	db.meta.productType = row[30]
+	db.meta.fileSize = db.readUint32Row(row, 31)
+
 	// check if is correct BIN (should be 2 for IP2Proxy BIN file), also checking for zipped file (PK being the first 2 chars)
 	if (db.meta.productCode != 2 && db.meta.databaseYear >= 21) || (db.meta.databaseType == 80 && db.meta.databaseColumn == 75) { // only BINs from Jan 2021 onwards have this byte set
 		return fatal(db, errors.New(msgInvalidBin))
 	}
+
+	if db.meta.ipV4IndexBaseAddr > 0 {
+		db.meta.ipV4Indexed = true
+	}
+
+	if db.meta.ipV6DatabaseCount > 0 && db.meta.ipV6IndexBaseAddr > 0 {
+		db.meta.ipV6Indexed = true
+	}
+
 	db.meta.ipV4ColumnSize = uint32(db.meta.databaseColumn << 2)              // 4 bytes each column
 	db.meta.ipV6ColumnSize = uint32(16 + ((db.meta.databaseColumn - 1) << 2)) // 4 bytes each column, except IPFrom column which is 16 bytes
 
@@ -793,8 +790,11 @@ func (d *DB) query(ipAddress string, mode uint32) (ip2proxyRecord, error) {
 	var high uint32
 	var mid uint32
 	var rowOffset uint32
-	var rowOffset2 uint32
 	var countryPos uint32
+	var firstCol uint32 = 4 // 4 bytes for ip from
+	var row []byte
+	var fullRow []byte
+	var readLen uint32
 	ipFrom := big.NewInt(0)
 	ipTo := big.NewInt(0)
 	maxIP := big.NewInt(0)
@@ -809,6 +809,7 @@ func (d *DB) query(ipAddress string, mode uint32) (ip2proxyRecord, error) {
 			x = loadMessage(msgIPV6Unsupported)
 			return x, nil
 		}
+		firstCol = 16 // 16 bytes for ip from
 		baseAddr = d.meta.ipV6DatabaseAddr
 		high = d.meta.ipV6DatabaseCount
 		maxIP = maxIPV6Range
@@ -817,14 +818,12 @@ func (d *DB) query(ipAddress string, mode uint32) (ip2proxyRecord, error) {
 
 	// reading index
 	if ipIndex > 0 {
-		low, err = d.readUint32(ipIndex)
+		row, err = d.readRow(ipIndex, 8) // 4 bytes each for IP From and IP To
 		if err != nil {
 			return x, err
 		}
-		high, err = d.readUint32(ipIndex + 4)
-		if err != nil {
-			return x, err
-		}
+		low = d.readUint32Row(row, 0)
+		high = d.readUint32Row(row, 4)
 	}
 
 	if ipNo.Cmp(maxIP) >= 0 {
@@ -834,43 +833,29 @@ func (d *DB) query(ipAddress string, mode uint32) (ip2proxyRecord, error) {
 	for low <= high {
 		mid = ((low + high) >> 1)
 		rowOffset = baseAddr + (mid * colSize)
-		rowOffset2 = rowOffset + colSize
+
+		// reading IP From + whole row + next IP From
+		readLen = colSize + firstCol
+		fullRow, err = d.readRow(rowOffset, readLen)
+		if err != nil {
+			return x, err
+		}
 
 		if ipType == 4 {
-			ipFrom32, err := d.readUint32(rowOffset)
-			if err != nil {
-				return x, err
-			}
+			ipFrom32 := d.readUint32Row(fullRow, 0)
 			ipFrom = big.NewInt(int64(ipFrom32))
 
-			ipTo32, err := d.readUint32(rowOffset2)
-			if err != nil {
-				return x, err
-			}
+			ipTo32 := d.readUint32Row(fullRow, colSize)
 			ipTo = big.NewInt(int64(ipTo32))
 		} else {
-			ipFrom, err = d.readUint128(rowOffset)
-			if err != nil {
-				return x, err
-			}
+			ipFrom = d.readUint128Row(fullRow, 0)
 
-			ipTo, err = d.readUint128(rowOffset2)
-			if err != nil {
-				return x, err
-			}
+			ipTo = d.readUint128Row(fullRow, colSize)
 		}
 
 		if ipNo.Cmp(ipFrom) >= 0 && ipNo.Cmp(ipTo) < 0 {
-			var firstCol uint32 = 4 // 4 bytes for ip from
-			if ipType == 6 {
-				firstCol = 16 // 16 bytes for ipv6
-			}
-
-			row := make([]byte, colSize-firstCol) // exclude the ip from field
-			_, err := d.f.ReadAt(row, int64(rowOffset+firstCol-1))
-			if err != nil {
-				return x, err
-			}
+			rowLen := colSize - firstCol
+			row = fullRow[firstCol:(firstCol + rowLen)] // extract the actual row data
 
 			if d.proxyTypeEnabled {
 				if mode&proxyType != 0 || mode&isProxy != 0 {

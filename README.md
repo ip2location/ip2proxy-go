@@ -1,4 +1,4 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/ip2location/ip2proxy-go)](https://goreportcard.com/report/github.com/ip2location/ip2proxy-go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ip2location/ip2proxy-go)](https://goreportcard.com/report/github.com/ip2location/ip2proxy-go/v3)
 
 # IP2Proxy Go Package
 
@@ -17,7 +17,7 @@ To install this module type the following:
 
 ```bash
 
-go get github.com/ip2location/ip2proxy-go
+go get github.com/ip2location/ip2proxy-go/v3
 
 ```
 
@@ -56,7 +56,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/ip2location/ip2proxy-go"
+	"github.com/ip2location/ip2proxy-go/v3"
 )
 
 func main() {
@@ -112,7 +112,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/ip2location/ip2proxy-go"
+	"github.com/ip2location/ip2proxy-go/v3"
 )
 
 func main() {
