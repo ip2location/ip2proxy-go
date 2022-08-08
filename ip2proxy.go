@@ -111,7 +111,7 @@ var lastSeenPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11}
 var threatPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12}
 var providerPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13}
 
-const moduleVersion string = "3.4.0"
+const moduleVersion string = "3.4.1"
 
 var maxIPV4Range = big.NewInt(4294967295)
 var maxIPV6Range = big.NewInt(0)
@@ -287,7 +287,7 @@ func (d *DB) readStr(pos uint32) (string, error) {
 	var retVal string
 	data := make([]byte, readLen)
 	_, err := d.f.ReadAt(data, pos2)
-	if err != nil {
+	if err != nil && err.Error() != "EOF" { // bypass EOF error coz we are reading 256 which may hit EOF
 		return "", err
 	}
 	strLen := data[0]
