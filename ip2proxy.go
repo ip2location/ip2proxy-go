@@ -10,10 +10,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"lukechampine.com/uint128"
 	"math/big"
 	"net"
 	"os"
 	"strconv"
+	"unsafe"
 )
 
 // Implement db reader interface
@@ -43,9 +45,9 @@ type ip2proxyMeta struct {
 	fileSize          uint32
 }
 
-// The ip2proxyRecord struct stores all of the available
+// The IP2ProxyRecord struct stores all of the available
 // proxy info found in the IP2Proxy database.
-type ip2proxyRecord struct {
+type IP2ProxyRecord struct {
 	countryShort string
 	countryLong  string
 	region       string
@@ -113,15 +115,15 @@ var providerPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13}
 
 const moduleVersion string = "3.4.1"
 
-var maxIPV4Range = big.NewInt(4294967295)
-var maxIPV6Range = big.NewInt(0)
-var fromV4Mapped = big.NewInt(281470681743360)
-var toV4Mapped = big.NewInt(281474976710655)
-var from6To4 = big.NewInt(0)
-var to6To4 = big.NewInt(0)
-var fromTeredo = big.NewInt(0)
-var toTeredo = big.NewInt(0)
-var last32Bits = big.NewInt(4294967295)
+var maxIPV4Range = uint128.From64(4294967295)
+var maxIPV6Range = uint128.From64(0)
+var fromV4Mapped = uint128.From64(281470681743360)
+var toV4Mapped = uint128.From64(281474976710655)
+var from6To4 = uint128.From64(0)
+var to6To4 = uint128.From64(0)
+var fromTeredo = uint128.From64(0)
+var toTeredo = uint128.From64(0)
+var last32Bits = uint128.From64(4294967295)
 
 const countryShort uint32 = 0x00001
 const countryLong uint32 = 0x00002
@@ -147,10 +149,10 @@ const msgIPV6Unsupported string = "IPV6 ADDRESS MISSING IN IPV4 BIN"
 const msgInvalidBin string = "Incorrect IP2Proxy BIN file format. Please make sure that you are using the latest IP2Proxy BIN file."
 
 // get IP type and calculate IP number; calculates index too if exists
-func (d *DB) checkIP(ip string) (ipType uint32, ipNum *big.Int, ipIndex uint32) {
+func (d *DB) checkIP(ip string) (ipType uint32, ipNum uint128.Uint128, ipIndex uint32) {
 	ipType = 0
-	ipNum = big.NewInt(0)
-	ipNumTmp := big.NewInt(0)
+	ipNum = uint128.From64(0)
+	ipNumTmp := uint128.From64(0)
 	ipIndex = 0
 	ipAddress := net.ParseIP(ip)
 
@@ -159,43 +161,43 @@ func (d *DB) checkIP(ip string) (ipType uint32, ipNum *big.Int, ipIndex uint32) 
 
 		if v4 != nil {
 			ipType = 4
-			ipNum.SetBytes(v4)
+			ipNum = uint128.From64(uint64(binary.BigEndian.Uint32(v4)))
 		} else {
 			v6 := ipAddress.To16()
 
 			if v6 != nil {
 				ipType = 6
-				ipNum.SetBytes(v6)
+				ipNum.PutBytes(v6)
 
 				if ipNum.Cmp(fromV4Mapped) >= 0 && ipNum.Cmp(toV4Mapped) <= 0 {
 					// ipv4-mapped ipv6 should treat as ipv4 and read ipv4 data section
 					ipType = 4
-					ipNum.Sub(ipNum, fromV4Mapped)
+					ipNum = ipNum.Sub(fromV4Mapped)
 				} else if ipNum.Cmp(from6To4) >= 0 && ipNum.Cmp(to6To4) <= 0 {
 					// 6to4 so need to remap to ipv4
 					ipType = 4
-					ipNum.Rsh(ipNum, 80)
-					ipNum.And(ipNum, last32Bits)
+					ipNum = ipNum.Rsh(80)
+					ipNum = ipNum.And(last32Bits)
 				} else if ipNum.Cmp(fromTeredo) >= 0 && ipNum.Cmp(toTeredo) <= 0 {
 					// Teredo so need to remap to ipv4
 					ipType = 4
-					ipNum.Not(ipNum)
-					ipNum.And(ipNum, last32Bits)
+					ipNum = uint128.Uint128{^ipNum.Lo, ^ipNum.Hi}
+					ipNum = ipNum.And(last32Bits)
 				}
 			}
 		}
 	}
 	if ipType == 4 {
 		if d.meta.ipV4Indexed {
-			ipNumTmp.Rsh(ipNum, 16)
-			ipNumTmp.Lsh(ipNumTmp, 3)
-			ipIndex = uint32(ipNumTmp.Add(ipNumTmp, big.NewInt(int64(d.meta.ipV4IndexBaseAddr))).Uint64())
+			ipNumTmp = ipNum.Rsh(16)
+			ipNumTmp = ipNumTmp.Lsh(3)
+			ipIndex = uint32(ipNumTmp.Add(uint128.From64(uint64(d.meta.ipV4IndexBaseAddr))).Lo)
 		}
 	} else if ipType == 6 {
 		if d.meta.ipV6Indexed {
-			ipNumTmp.Rsh(ipNum, 112)
-			ipNumTmp.Lsh(ipNumTmp, 3)
-			ipIndex = uint32(ipNumTmp.Add(ipNumTmp, big.NewInt(int64(d.meta.ipV6IndexBaseAddr))).Uint64())
+			ipNumTmp = ipNum.Rsh(112)
+			ipNumTmp = ipNumTmp.Lsh(3)
+			ipIndex = uint32(ipNumTmp.Add(uint128.From64(uint64(d.meta.ipV6IndexBaseAddr))).Lo)
 		}
 	}
 	return
@@ -250,33 +252,33 @@ func (d *DB) readUint32(pos uint32) (uint32, error) {
 }
 
 // read unsigned 128-bit integer from slices
-func (d *DB) readUint128Row(row []byte, pos uint32) *big.Int {
-	retVal := big.NewInt(0)
+func (d *DB) readUint128Row(row []byte, pos uint32) uint128.Uint128 {
+	retVal := uint128.From64(0)
 	data := row[pos : pos+16]
 
 	// little endian to big endian
 	for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
 		data[i], data[j] = data[j], data[i]
 	}
-	retVal.SetBytes(data)
+	retVal.PutBytes(data)
 	return retVal
 }
 
 // read unsigned 128-bit integer
-func (d *DB) readUint128(pos uint32) (*big.Int, error) {
+func (d *DB) readUint128(pos uint32) (uint128.Uint128, error) {
 	pos2 := int64(pos)
-	retVal := big.NewInt(0)
+	retVal := uint128.From64(0)
 	data := make([]byte, 16)
 	_, err := d.f.ReadAt(data, pos2-1)
 	if err != nil {
-		return nil, err
+		return uint128.From64(0), err
 	}
 
 	// little endian to big endian
 	for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
 		data[i], data[j] = data[j], data[i]
 	}
-	retVal.SetBytes(data)
+	retVal.PutBytes(data)
 	return retVal, nil
 }
 
@@ -291,7 +293,7 @@ func (d *DB) readStr(pos uint32) (string, error) {
 		return "", err
 	}
 	strLen := data[0]
-	retVal = string(data[1:(strLen + 1)])
+	retVal = convertBytesToString(data[1:(strLen + 1)])
 	return retVal, nil
 }
 
@@ -316,11 +318,25 @@ func OpenDB(dbPath string) (*DB, error) {
 func OpenDBWithReader(reader dbReader) (*DB, error) {
 	var db = &DB{}
 
-	maxIPV6Range.SetString("340282366920938463463374607431768211455", 10)
-	from6To4.SetString("42545680458834377588178886921629466624", 10)
-	to6To4.SetString("42550872755692912415807417417958686719", 10)
-	fromTeredo.SetString("42540488161975842760550356425300246528", 10)
-	toTeredo.SetString("42540488241204005274814694018844196863", 10)
+	_maxIPV6Range := big.NewInt(0)
+	_maxIPV6Range.SetString("340282366920938463463374607431768211455", 10)
+	maxIPV6Range = uint128.FromBig(_maxIPV6Range)
+
+	_from6To4 := big.NewInt(0)
+	_from6To4.SetString("42545680458834377588178886921629466624", 10)
+	from6To4 = uint128.FromBig(_from6To4)
+
+	_to6To4 := big.NewInt(0)
+	_to6To4.SetString("42550872755692912415807417417958686719", 10)
+	to6To4 = uint128.FromBig(_to6To4)
+
+	_fromTeredo := big.NewInt(0)
+	_fromTeredo.SetString("42540488161975842760550356425300246528", 10)
+	fromTeredo = uint128.FromBig(_fromTeredo)
+
+	_toTeredo := big.NewInt(0)
+	_toTeredo.SetString("42540488241204005274814694018844196863", 10)
+	toTeredo = uint128.FromBig(_toTeredo)
 
 	db.f = reader
 
@@ -509,8 +525,8 @@ func (d *DB) DatabaseVersion() string {
 }
 
 // populate record with message
-func loadMessage(mesg string) ip2proxyRecord {
-	var x ip2proxyRecord
+func loadMessage(mesg string) IP2ProxyRecord {
+	var x IP2ProxyRecord
 
 	x.countryShort = mesg
 	x.countryLong = mesg
@@ -530,11 +546,18 @@ func loadMessage(mesg string) ip2proxyRecord {
 	return x
 }
 
-func handleError(rec ip2proxyRecord, err error) ip2proxyRecord {
+func handleError(rec IP2ProxyRecord, err error) IP2ProxyRecord {
 	if err != nil {
 		fmt.Print(err)
 	}
 	return rec
+}
+
+// convertBytesToString provides a no-copy []byte to string conversion.
+// This implementation is adopted by official strings.Builder.
+// Reference: https://github.com/golang/go/issues/25484
+func convertBytesToString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
 }
 
 // GetAll will return all proxy fields based on the queried IP address.
@@ -658,27 +681,8 @@ func IsProxy(ipAddress string) int8 {
 }
 
 // GetAll will return all proxy fields based on the queried IP address.
-func (d *DB) GetAll(ipAddress string) (map[string]string, error) {
-	data, err := d.query(ipAddress, all)
-
-	var x = make(map[string]string)
-	s := strconv.Itoa(int(data.isProxy))
-	x["isProxy"] = s
-	x["ProxyType"] = data.proxyType
-	x["CountryShort"] = data.countryShort
-	x["CountryLong"] = data.countryLong
-	x["Region"] = data.region
-	x["City"] = data.city
-	x["ISP"] = data.isp
-	x["Domain"] = data.domain
-	x["UsageType"] = data.usageType
-	x["ASN"] = data.asn
-	x["AS"] = data.as
-	x["LastSeen"] = data.lastSeen
-	x["Threat"] = data.threat
-	x["Provider"] = data.provider
-
-	return x, err
+func (d *DB) GetAll(ipAddress string) (IP2ProxyRecord, error) {
+	return d.query(ipAddress, all)
 }
 
 // GetCountryShort will return the ISO-3166 country code based on the queried IP address.
@@ -766,7 +770,7 @@ func (d *DB) IsProxy(ipAddress string) (int8, error) {
 }
 
 // main query
-func (d *DB) query(ipAddress string, mode uint32) (ip2proxyRecord, error) {
+func (d *DB) query(ipAddress string, mode uint32) (IP2ProxyRecord, error) {
 	x := loadMessage(msgNotSupported) // default message
 
 	// read metadata
@@ -795,9 +799,9 @@ func (d *DB) query(ipAddress string, mode uint32) (ip2proxyRecord, error) {
 	var row []byte
 	var fullRow []byte
 	var readLen uint32
-	ipFrom := big.NewInt(0)
-	ipTo := big.NewInt(0)
-	maxIP := big.NewInt(0)
+	ipFrom := uint128.From64(0)
+	ipTo := uint128.From64(0)
+	maxIP := uint128.From64(0)
 
 	if ipType == 4 {
 		baseAddr = d.meta.ipV4DatabaseAddr
@@ -827,7 +831,7 @@ func (d *DB) query(ipAddress string, mode uint32) (ip2proxyRecord, error) {
 	}
 
 	if ipNo.Cmp(maxIP) >= 0 {
-		ipNo.Sub(ipNo, big.NewInt(1))
+		ipNo = ipNo.Sub(uint128.From64(1))
 	}
 
 	for low <= high {
@@ -843,10 +847,10 @@ func (d *DB) query(ipAddress string, mode uint32) (ip2proxyRecord, error) {
 
 		if ipType == 4 {
 			ipFrom32 := d.readUint32Row(fullRow, 0)
-			ipFrom = big.NewInt(int64(ipFrom32))
+			ipFrom = uint128.From64(uint64(ipFrom32))
 
 			ipTo32 := d.readUint32Row(fullRow, colSize)
-			ipTo = big.NewInt(int64(ipTo32))
+			ipTo = uint128.From64(uint64(ipTo32))
 		} else {
 			ipFrom = d.readUint128Row(fullRow, 0)
 
