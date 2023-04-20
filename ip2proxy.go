@@ -149,8 +149,8 @@ const msgIPV6Unsupported string = "IPV6 ADDRESS MISSING IN IPV4 BIN"
 const msgInvalidBin string = "Incorrect IP2Proxy BIN file format. Please make sure that you are using the latest IP2Proxy BIN file."
 
 func reverseBytes(s []byte) {
-	for i,j := 0, len(s) - 1; i<j; i,j = i+1, j-1 {
-		s[i],s[j] = s[j], s[i]
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
 	}
 }
 
@@ -180,7 +180,7 @@ func (d *DB) checkIP(ip string) (ipType uint32, ipNum uint128.Uint128, ipIndex u
 				// ipNum.ReverseBytes()
 				ipNum = uint128.FromBytes(v6)
 				// ipNum.ReverseBytes()
-				
+
 				// fmt.Printf("ipNum RAW: %v\n", ipNum)
 				// fmt.Printf("ipNum: %s\n", ipNum.String())
 
@@ -273,7 +273,7 @@ func (d *DB) readUint128Row(row []byte, pos uint32) uint128.Uint128 {
 
 	// little endian to big endian
 	// for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
-		// data[i], data[j] = data[j], data[i]
+	// data[i], data[j] = data[j], data[i]
 	// }
 	// retVal.PutBytes(data)
 	retVal = uint128.FromBytes(data)
@@ -292,7 +292,7 @@ func (d *DB) readUint128(pos uint32) (uint128.Uint128, error) {
 
 	// little endian to big endian
 	// for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
-		// data[i], data[j] = data[j], data[i]
+	// data[i], data[j] = data[j], data[i]
 	// }
 	// retVal.PutBytes(data)
 	retVal = uint128.FromBytes(data)
@@ -683,7 +683,7 @@ func (d *DB) query(ipAddress string, mode uint32) (IP2ProxyRecord, error) {
 
 			ipTo = d.readUint128Row(fullRow, colSize)
 		}
-		
+
 		// fmt.Printf("ipFrom: %v ipTo: %v\n", ipFrom, ipTo)
 
 		if ipNo.Cmp(ipFrom) >= 0 && ipNo.Cmp(ipTo) < 0 {
