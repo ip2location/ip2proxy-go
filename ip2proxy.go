@@ -48,20 +48,20 @@ type ip2proxyMeta struct {
 // The IP2ProxyRecord struct stores all of the available
 // proxy info found in the IP2Proxy database.
 type IP2ProxyRecord struct {
-	countryShort string
-	countryLong  string
-	region       string
-	city         string
-	isp          string
-	proxyType    string
-	domain       string
-	usageType    string
-	asn          string
-	as           string
-	lastSeen     string
-	threat       string
-	provider     string
-	isProxy      int8
+	CountryShort string
+	CountryLong  string
+	Region       string
+	City         string
+	Isp          string
+	ProxyType    string
+	Domain       string
+	UsageType    string
+	Asn          string
+	As           string
+	LastSeen     string
+	Threat       string
+	Provider     string
+	IsProxy      int8
 }
 
 // The DB struct is the main object used to query the IP2Proxy BIN file.
@@ -113,7 +113,7 @@ var lastSeenPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11}
 var threatPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12}
 var providerPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13}
 
-const moduleVersion string = "3.4.1"
+const moduleVersion string = "4.0.0"
 
 var maxIPV4Range = uint128.From64(4294967295)
 var maxIPV6Range = uint128.From64(0)
@@ -148,6 +148,12 @@ const msgMissingFile string = "MISSING FILE"
 const msgIPV6Unsupported string = "IPV6 ADDRESS MISSING IN IPV4 BIN"
 const msgInvalidBin string = "Incorrect IP2Proxy BIN file format. Please make sure that you are using the latest IP2Proxy BIN file."
 
+func reverseBytes(s []byte) {
+	for i,j := 0, len(s) - 1; i<j; i,j = i+1, j-1 {
+		s[i],s[j] = s[j], s[i]
+	}
+}
+
 // get IP type and calculate IP number; calculates index too if exists
 func (d *DB) checkIP(ip string) (ipType uint32, ipNum uint128.Uint128, ipIndex uint32) {
 	ipType = 0
@@ -164,10 +170,19 @@ func (d *DB) checkIP(ip string) (ipType uint32, ipNum uint128.Uint128, ipIndex u
 			ipNum = uint128.From64(uint64(binary.BigEndian.Uint32(v4)))
 		} else {
 			v6 := ipAddress.To16()
+			// fmt.Printf("v6: %v\n", v6)
 
 			if v6 != nil {
 				ipType = 6
-				ipNum.PutBytes(v6)
+				reverseBytes(v6)
+				// fmt.Printf("v6 REVERSE: %v\n", v6)
+				// ipNum.PutBytes(v6)
+				// ipNum.ReverseBytes()
+				ipNum = uint128.FromBytes(v6)
+				// ipNum.ReverseBytes()
+				
+				// fmt.Printf("ipNum RAW: %v\n", ipNum)
+				// fmt.Printf("ipNum: %s\n", ipNum.String())
 
 				if ipNum.Cmp(fromV4Mapped) >= 0 && ipNum.Cmp(toV4Mapped) <= 0 {
 					// ipv4-mapped ipv6 should treat as ipv4 and read ipv4 data section
@@ -257,10 +272,11 @@ func (d *DB) readUint128Row(row []byte, pos uint32) uint128.Uint128 {
 	data := row[pos : pos+16]
 
 	// little endian to big endian
-	for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
-		data[i], data[j] = data[j], data[i]
-	}
-	retVal.PutBytes(data)
+	// for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
+		// data[i], data[j] = data[j], data[i]
+	// }
+	// retVal.PutBytes(data)
+	retVal = uint128.FromBytes(data)
 	return retVal
 }
 
@@ -275,10 +291,11 @@ func (d *DB) readUint128(pos uint32) (uint128.Uint128, error) {
 	}
 
 	// little endian to big endian
-	for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
-		data[i], data[j] = data[j], data[i]
-	}
-	retVal.PutBytes(data)
+	// for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
+		// data[i], data[j] = data[j], data[i]
+	// }
+	// retVal.PutBytes(data)
+	retVal = uint128.FromBytes(data)
 	return retVal, nil
 }
 
@@ -435,83 +452,9 @@ func OpenDBWithReader(reader dbReader) (*DB, error) {
 	return db, nil
 }
 
-// Open takes the path to the IP2Proxy BIN database file. It will read all the metadata required to
-// be able to extract the embedded proxy data.
-//
-// Deprecated: No longer being updated.
-func Open(dbPath string) int8 {
-	db, err := OpenDB(dbPath)
-	if err != nil {
-		return -1
-	}
-	defaultDB = db
-	return 0
-}
-
-// Close will close the file handle to the BIN file and reset.
-//
-// Deprecated: No longer being updated.
-func Close() int8 {
-	defaultDB.meta.databaseType = 0
-	defaultDB.meta.databaseColumn = 0
-	defaultDB.meta.databaseYear = 0
-	defaultDB.meta.databaseMonth = 0
-	defaultDB.meta.databaseDay = 0
-	defaultDB.meta.ipV4DatabaseCount = 0
-	defaultDB.meta.ipV4DatabaseAddr = 0
-	defaultDB.meta.ipV6DatabaseCount = 0
-	defaultDB.meta.ipV6DatabaseAddr = 0
-	defaultDB.meta.ipV4IndexBaseAddr = 0
-	defaultDB.meta.ipV6IndexBaseAddr = 0
-	defaultDB.meta.ipV4ColumnSize = 0
-	defaultDB.meta.ipV6ColumnSize = 0
-	defaultDB.metaOK = false
-	defaultDB.countryPositionOffset = 0
-	defaultDB.regionPositionOffset = 0
-	defaultDB.cityPositionOffset = 0
-	defaultDB.ispPositionOffset = 0
-	defaultDB.proxyTypePositionOffset = 0
-	defaultDB.domainPositionOffset = 0
-	defaultDB.usageTypePositionOffset = 0
-	defaultDB.asnPositionOffset = 0
-	defaultDB.asPositionOffset = 0
-	defaultDB.lastSeenPositionOffset = 0
-	defaultDB.countryEnabled = false
-	defaultDB.regionEnabled = false
-	defaultDB.cityEnabled = false
-	defaultDB.ispEnabled = false
-	defaultDB.proxyTypeEnabled = false
-	defaultDB.domainEnabled = false
-	defaultDB.usageTypeEnabled = false
-	defaultDB.asnEnabled = false
-	defaultDB.asEnabled = false
-	defaultDB.lastSeenEnabled = false
-
-	err := defaultDB.Close()
-
-	if err != nil {
-		return -1
-	}
-	return 0
-}
-
 // ModuleVersion returns the version of the component.
 func ModuleVersion() string {
 	return moduleVersion
-}
-
-// PackageVersion returns the database type.
-//
-// Deprecated: No longer being updated.
-func PackageVersion() string {
-	return strconv.Itoa(int(defaultDB.meta.databaseType))
-}
-
-// DatabaseVersion returns the database version.
-//
-// Deprecated: No longer being updated.
-func DatabaseVersion() string {
-	return "20" + strconv.Itoa(int(defaultDB.meta.databaseYear)) + "." + strconv.Itoa(int(defaultDB.meta.databaseMonth)) + "." + strconv.Itoa(int(defaultDB.meta.databaseDay))
 }
 
 // PackageVersion returns the database type.
@@ -528,20 +471,20 @@ func (d *DB) DatabaseVersion() string {
 func loadMessage(mesg string) IP2ProxyRecord {
 	var x IP2ProxyRecord
 
-	x.countryShort = mesg
-	x.countryLong = mesg
-	x.region = mesg
-	x.city = mesg
-	x.isp = mesg
-	x.proxyType = mesg
-	x.domain = mesg
-	x.usageType = mesg
-	x.asn = mesg
-	x.as = mesg
-	x.lastSeen = mesg
-	x.threat = mesg
-	x.provider = mesg
-	x.isProxy = -1
+	x.CountryShort = mesg
+	x.CountryLong = mesg
+	x.Region = mesg
+	x.City = mesg
+	x.Isp = mesg
+	x.ProxyType = mesg
+	x.Domain = mesg
+	x.UsageType = mesg
+	x.Asn = mesg
+	x.As = mesg
+	x.LastSeen = mesg
+	x.Threat = mesg
+	x.Provider = mesg
+	x.IsProxy = -1
 
 	return x
 }
@@ -561,126 +504,6 @@ func convertBytesToString(b []byte) string {
 }
 
 // GetAll will return all proxy fields based on the queried IP address.
-//
-// Deprecated: No longer being updated.
-func GetAll(ipAddress string) map[string]string {
-	data := handleError(defaultDB.query(ipAddress, all))
-
-	var x = make(map[string]string)
-	s := strconv.Itoa(int(data.isProxy))
-	x["isProxy"] = s
-	x["ProxyType"] = data.proxyType
-	x["CountryShort"] = data.countryShort
-	x["CountryLong"] = data.countryLong
-	x["Region"] = data.region
-	x["City"] = data.city
-	x["ISP"] = data.isp
-	x["Domain"] = data.domain
-	x["UsageType"] = data.usageType
-	x["ASN"] = data.asn
-	x["AS"] = data.as
-	x["LastSeen"] = data.lastSeen
-
-	return x
-}
-
-// GetCountryShort will return the ISO-3166 country code based on the queried IP address.
-//
-// Deprecated: No longer being updated.
-func GetCountryShort(ipAddress string) string {
-	data := handleError(defaultDB.query(ipAddress, countryShort))
-	return data.countryShort
-}
-
-// GetCountryLong will return the country name based on the queried IP address.
-//
-// Deprecated: No longer being updated.
-func GetCountryLong(ipAddress string) string {
-	data := handleError(defaultDB.query(ipAddress, countryLong))
-	return data.countryLong
-}
-
-// GetRegion will return the region name based on the queried IP address.
-//
-// Deprecated: No longer being updated.
-func GetRegion(ipAddress string) string {
-	data := handleError(defaultDB.query(ipAddress, region))
-	return data.region
-}
-
-// GetCity will return the city name based on the queried IP address.
-//
-// Deprecated: No longer being updated.
-func GetCity(ipAddress string) string {
-	data := handleError(defaultDB.query(ipAddress, city))
-	return data.city
-}
-
-// GetIsp will return the Internet Service Provider name based on the queried IP address.
-//
-// Deprecated: No longer being updated.
-func GetIsp(ipAddress string) string {
-	data := handleError(defaultDB.query(ipAddress, isp))
-	return data.isp
-}
-
-// GetProxyType will return the proxy type based on the queried IP address.
-//
-// Deprecated: No longer being updated.
-func GetProxyType(ipAddress string) string {
-	data := handleError(defaultDB.query(ipAddress, proxyType))
-	return data.proxyType
-}
-
-// GetDomain will return the domain name based on the queried IP address.
-//
-// Deprecated: No longer being updated.
-func GetDomain(ipAddress string) string {
-	data := handleError(defaultDB.query(ipAddress, domain))
-	return data.domain
-}
-
-// GetUsageType will return the usage type based on the queried IP address.
-//
-// Deprecated: No longer being updated.
-func GetUsageType(ipAddress string) string {
-	data := handleError(defaultDB.query(ipAddress, usageType))
-	return data.usageType
-}
-
-// GetAsn will return the autonomous system number based on the queried IP address.
-//
-// Deprecated: No longer being updated.
-func GetAsn(ipAddress string) string {
-	data := handleError(defaultDB.query(ipAddress, asn))
-	return data.asn
-}
-
-// GetAs will return the autonomous system name based on the queried IP address.
-//
-// Deprecated: No longer being updated.
-func GetAs(ipAddress string) string {
-	data := handleError(defaultDB.query(ipAddress, as))
-	return data.as
-}
-
-// GetLastSeen will return the number of days that the proxy was last seen based on the queried IP address.
-//
-// Deprecated: No longer being updated.
-func GetLastSeen(ipAddress string) string {
-	data := handleError(defaultDB.query(ipAddress, lastSeen))
-	return data.lastSeen
-}
-
-// IsProxy checks whether the queried IP address was a proxy. Returned value: -1 (errors), 0 (not a proxy), 1 (a proxy), 2 (a data center IP address or search engine robot).
-//
-// Deprecated: No longer being updated.
-func IsProxy(ipAddress string) int8 {
-	data := handleError(defaultDB.query(ipAddress, isProxy))
-	return data.isProxy
-}
-
-// GetAll will return all proxy fields based on the queried IP address.
 func (d *DB) GetAll(ipAddress string) (IP2ProxyRecord, error) {
 	return d.query(ipAddress, all)
 }
@@ -688,85 +511,85 @@ func (d *DB) GetAll(ipAddress string) (IP2ProxyRecord, error) {
 // GetCountryShort will return the ISO-3166 country code based on the queried IP address.
 func (d *DB) GetCountryShort(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, countryShort)
-	return data.countryShort, err
+	return data.CountryShort, err
 }
 
 // GetCountryLong will return the country name based on the queried IP address.
 func (d *DB) GetCountryLong(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, countryLong)
-	return data.countryLong, err
+	return data.CountryLong, err
 }
 
 // GetRegion will return the region name based on the queried IP address.
 func (d *DB) GetRegion(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, region)
-	return data.region, err
+	return data.Region, err
 }
 
 // GetCity will return the city name based on the queried IP address.
 func (d *DB) GetCity(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, city)
-	return data.city, err
+	return data.City, err
 }
 
 // GetIsp will return the Internet Service Provider name based on the queried IP address.
 func (d *DB) GetIsp(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, isp)
-	return data.isp, err
+	return data.Isp, err
 }
 
 // GetProxyType will return the proxy type based on the queried IP address.
 func (d *DB) GetProxyType(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, proxyType)
-	return data.proxyType, err
+	return data.ProxyType, err
 }
 
 // GetDomain will return the domain name based on the queried IP address.
 func (d *DB) GetDomain(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, domain)
-	return data.domain, err
+	return data.Domain, err
 }
 
 // GetUsageType will return the usage type based on the queried IP address.
 func (d *DB) GetUsageType(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, usageType)
-	return data.usageType, err
+	return data.UsageType, err
 }
 
 // GetAsn will return the autonomous system number based on the queried IP address.
 func (d *DB) GetAsn(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, asn)
-	return data.asn, err
+	return data.Asn, err
 }
 
 // GetAs will return the autonomous system name based on the queried IP address.
 func (d *DB) GetAs(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, as)
-	return data.as, err
+	return data.As, err
 }
 
 // GetLastSeen will return the number of days that the proxy was last seen based on the queried IP address.
 func (d *DB) GetLastSeen(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, lastSeen)
-	return data.lastSeen, err
+	return data.LastSeen, err
 }
 
 // GetThreat will return the threat type of the proxy.
 func (d *DB) GetThreat(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, threat)
-	return data.threat, err
+	return data.Threat, err
 }
 
 // GetProvider will return the provider of the proxy.
 func (d *DB) GetProvider(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, provider)
-	return data.provider, err
+	return data.Provider, err
 }
 
 // IsProxy checks whether the queried IP address was a proxy. Returned value: -1 (errors), 0 (not a proxy), 1 (a proxy), 2 (a data center IP address or search engine robot).
 func (d *DB) IsProxy(ipAddress string) (int8, error) {
 	data, err := d.query(ipAddress, isProxy)
-	return data.isProxy, err
+	return data.IsProxy, err
 }
 
 // main query
@@ -781,6 +604,8 @@ func (d *DB) query(ipAddress string, mode uint32) (IP2ProxyRecord, error) {
 
 	// check IP type and return IP number & index (if exists)
 	ipType, ipNo, ipIndex := d.checkIP(ipAddress)
+
+	// fmt.Printf("ipType: %d\n", ipType);
 
 	if ipType == 0 {
 		x = loadMessage(msgInvalidIP)
@@ -822,6 +647,7 @@ func (d *DB) query(ipAddress string, mode uint32) (IP2ProxyRecord, error) {
 
 	// reading index
 	if ipIndex > 0 {
+		// fmt.Printf("ipIndex: %d\n", ipIndex);
 		row, err = d.readRow(ipIndex, 8) // 4 bytes each for IP From and IP To
 		if err != nil {
 			return x, err
@@ -836,6 +662,7 @@ func (d *DB) query(ipAddress string, mode uint32) (IP2ProxyRecord, error) {
 
 	for low <= high {
 		mid = ((low + high) >> 1)
+		// fmt.Printf("LOW: %d MID: %d HIGH: %d\n", low, mid, high);
 		rowOffset = baseAddr + (mid * colSize)
 
 		// reading IP From + whole row + next IP From
@@ -856,6 +683,8 @@ func (d *DB) query(ipAddress string, mode uint32) (IP2ProxyRecord, error) {
 
 			ipTo = d.readUint128Row(fullRow, colSize)
 		}
+		
+		// fmt.Printf("ipFrom: %v ipTo: %v\n", ipFrom, ipTo)
 
 		if ipNo.Cmp(ipFrom) >= 0 && ipNo.Cmp(ipTo) < 0 {
 			rowLen := colSize - firstCol
@@ -863,7 +692,7 @@ func (d *DB) query(ipAddress string, mode uint32) (IP2ProxyRecord, error) {
 
 			if d.proxyTypeEnabled {
 				if mode&proxyType != 0 || mode&isProxy != 0 {
-					if x.proxyType, err = d.readStr(d.readUint32Row(row, d.proxyTypePositionOffset)); err != nil {
+					if x.ProxyType, err = d.readStr(d.readUint32Row(row, d.proxyTypePositionOffset)); err != nil {
 						return x, err
 					}
 				}
@@ -874,84 +703,84 @@ func (d *DB) query(ipAddress string, mode uint32) (IP2ProxyRecord, error) {
 					countryPos = d.readUint32Row(row, d.countryPositionOffset)
 				}
 				if mode&countryShort != 0 || mode&isProxy != 0 {
-					if x.countryShort, err = d.readStr(countryPos); err != nil {
+					if x.CountryShort, err = d.readStr(countryPos); err != nil {
 						return x, err
 					}
 				}
 				if mode&countryLong != 0 {
-					if x.countryLong, err = d.readStr(countryPos + 3); err != nil {
+					if x.CountryLong, err = d.readStr(countryPos + 3); err != nil {
 						return x, err
 					}
 				}
 			}
 
 			if mode&region != 0 && d.regionEnabled {
-				if x.region, err = d.readStr(d.readUint32Row(row, d.regionPositionOffset)); err != nil {
+				if x.Region, err = d.readStr(d.readUint32Row(row, d.regionPositionOffset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&city != 0 && d.cityEnabled {
-				if x.city, err = d.readStr(d.readUint32Row(row, d.cityPositionOffset)); err != nil {
+				if x.City, err = d.readStr(d.readUint32Row(row, d.cityPositionOffset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&isp != 0 && d.ispEnabled {
-				if x.isp, err = d.readStr(d.readUint32Row(row, d.ispPositionOffset)); err != nil {
+				if x.Isp, err = d.readStr(d.readUint32Row(row, d.ispPositionOffset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&domain != 0 && d.domainEnabled {
-				if x.domain, err = d.readStr(d.readUint32Row(row, d.domainPositionOffset)); err != nil {
+				if x.Domain, err = d.readStr(d.readUint32Row(row, d.domainPositionOffset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&usageType != 0 && d.usageTypeEnabled {
-				if x.usageType, err = d.readStr(d.readUint32Row(row, d.usageTypePositionOffset)); err != nil {
+				if x.UsageType, err = d.readStr(d.readUint32Row(row, d.usageTypePositionOffset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&asn != 0 && d.asnEnabled {
-				if x.asn, err = d.readStr(d.readUint32Row(row, d.asnPositionOffset)); err != nil {
+				if x.Asn, err = d.readStr(d.readUint32Row(row, d.asnPositionOffset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&as != 0 && d.asEnabled {
-				if x.as, err = d.readStr(d.readUint32Row(row, d.asPositionOffset)); err != nil {
+				if x.As, err = d.readStr(d.readUint32Row(row, d.asPositionOffset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&lastSeen != 0 && d.lastSeenEnabled {
-				if x.lastSeen, err = d.readStr(d.readUint32Row(row, d.lastSeenPositionOffset)); err != nil {
+				if x.LastSeen, err = d.readStr(d.readUint32Row(row, d.lastSeenPositionOffset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&threat != 0 && d.threatEnabled {
-				if x.threat, err = d.readStr(d.readUint32Row(row, d.threatPositionOffset)); err != nil {
+				if x.Threat, err = d.readStr(d.readUint32Row(row, d.threatPositionOffset)); err != nil {
 					return x, err
 				}
 			}
 
 			if mode&provider != 0 && d.providerEnabled {
-				if x.provider, err = d.readStr(d.readUint32Row(row, d.providerPositionOffset)); err != nil {
+				if x.Provider, err = d.readStr(d.readUint32Row(row, d.providerPositionOffset)); err != nil {
 					return x, err
 				}
 			}
 
-			if x.countryShort == "-" || x.proxyType == "-" {
-				x.isProxy = 0
+			if x.CountryShort == "-" || x.ProxyType == "-" {
+				x.IsProxy = 0
 			} else {
-				if x.proxyType == "DCH" || x.proxyType == "SES" {
-					x.isProxy = 2
+				if x.ProxyType == "DCH" || x.ProxyType == "SES" {
+					x.IsProxy = 2
 				} else {
-					x.isProxy = 1
+					x.IsProxy = 1
 				}
 			}
 

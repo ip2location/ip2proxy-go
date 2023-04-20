@@ -1,5 +1,5 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/ip2location/ip2proxy-go/v3)](https://goreportcard.com/report/github.com/ip2location/ip2proxy-go/v3)
-[![PkgGoDev](https://pkg.go.dev/badge/github.com/ip2location/ip2proxy-go/v3)](https://pkg.go.dev/github.com/ip2location/ip2proxy-go/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ip2location/ip2proxy-go/v4)](https://goreportcard.com/report/github.com/ip2location/ip2proxy-go/v4)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/ip2location/ip2proxy-go/v4)](https://pkg.go.dev/github.com/ip2location/ip2proxy-go/v4)
 
 # IP2Proxy Go Package
 
@@ -18,7 +18,7 @@ To install this module type the following:
 
 ```bash
 
-go get github.com/ip2location/ip2proxy-go/v3
+go get github.com/ip2location/ip2proxy-go/v4
 
 ```
 
@@ -57,7 +57,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/ip2location/ip2proxy-go/v3"
+	"strconv"
+	"github.com/ip2location/ip2proxy-go/v4"
 )
 
 func main() {
@@ -78,20 +79,19 @@ func main() {
 	fmt.Printf("PackageVersion: %s\n", db.PackageVersion())
 	fmt.Printf("DatabaseVersion: %s\n", db.DatabaseVersion())
 	
-	fmt.Printf("isProxy: %s\n", all["isProxy"])
-	fmt.Printf("ProxyType: %s\n", all["ProxyType"])
-	fmt.Printf("CountryShort: %s\n", all["CountryShort"])
-	fmt.Printf("CountryLong: %s\n", all["CountryLong"])
-	fmt.Printf("Region: %s\n", all["Region"])
-	fmt.Printf("City: %s\n", all["City"])
-	fmt.Printf("ISP: %s\n", all["ISP"])
-	fmt.Printf("Domain: %s\n", all["Domain"])
-	fmt.Printf("UsageType: %s\n", all["UsageType"])
-	fmt.Printf("ASN: %s\n", all["ASN"])
-	fmt.Printf("AS: %s\n", all["AS"])
-	fmt.Printf("LastSeen: %s\n", all["LastSeen"])
-	fmt.Printf("Threat: %s\n", all["Threat"])
-	fmt.Printf("Provider: %s\n", all["Provider"])
+	fmt.Printf("IsProxy: %s\n", strconv.Itoa(int(all.IsProxy)));
+	fmt.Printf("ProxyType: %s\n", all.ProxyType);
+	fmt.Printf("CountryShort: %s\n", all.CountryShort);
+	fmt.Printf("CountryLong: %s\n", all.CountryLong);
+	fmt.Printf("Region: %s\n", all.Region);
+	fmt.Printf("City: %s\n", all.City);
+	fmt.Printf("Isp: %s\n", all.Isp);
+	fmt.Printf("Domain: %s\n", all.Domain);
+	fmt.Printf("UsageType: %s\n", all.UsageType);
+	fmt.Printf("Asn: %s\n", all.Asn);
+	fmt.Printf("As: %s\n", all.As);
+	fmt.Printf("LastSeen: %s\n", all.LastSeen);
+	fmt.Printf("Threat: %s\n", all.Threat);
 	
 	db.Close()
 }

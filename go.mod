@@ -1,4 +1,4 @@
-module github.com/ip2location/ip2proxy-go/v3
+module github.com/ip2location/ip2proxy-go/v4
 
 go 1.14
 
