@@ -1,6 +1,7 @@
 // Package ip2proxy allows user to query an IP address if it was being used as
 // VPN anonymizer, open proxies, web proxies, Tor exits, data center,
-// web hosting (DCH) range, search engine robots (SES) and residential (RES)
+// web hosting (DCH) range, search engine robots (SES), residential (RES),
+// consumer privacy networks (CPN) and enterprise private networks (EPN)
 // by using the IP2Proxy database.
 package ip2proxy
 
@@ -61,6 +62,7 @@ type IP2ProxyRecord struct {
 	LastSeen     string
 	Threat       string
 	Provider     string
+	FraudScore   string
 	IsProxy      int8
 }
 
@@ -69,51 +71,54 @@ type DB struct {
 	f    dbReader
 	meta ip2proxyMeta
 
-	countryPositionOffset   uint32
-	regionPositionOffset    uint32
-	cityPositionOffset      uint32
-	ispPositionOffset       uint32
-	proxyTypePositionOffset uint32
-	domainPositionOffset    uint32
-	usageTypePositionOffset uint32
-	asnPositionOffset       uint32
-	asPositionOffset        uint32
-	lastSeenPositionOffset  uint32
-	threatPositionOffset    uint32
-	providerPositionOffset  uint32
+	countryPositionOffset    uint32
+	regionPositionOffset     uint32
+	cityPositionOffset       uint32
+	ispPositionOffset        uint32
+	proxyTypePositionOffset  uint32
+	domainPositionOffset     uint32
+	usageTypePositionOffset  uint32
+	asnPositionOffset        uint32
+	asPositionOffset         uint32
+	lastSeenPositionOffset   uint32
+	threatPositionOffset     uint32
+	providerPositionOffset   uint32
+	fraudScorePositionOffset uint32
 
-	countryEnabled   bool
-	regionEnabled    bool
-	cityEnabled      bool
-	ispEnabled       bool
-	proxyTypeEnabled bool
-	domainEnabled    bool
-	usageTypeEnabled bool
-	asnEnabled       bool
-	asEnabled        bool
-	lastSeenEnabled  bool
-	threatEnabled    bool
-	providerEnabled  bool
+	countryEnabled    bool
+	regionEnabled     bool
+	cityEnabled       bool
+	ispEnabled        bool
+	proxyTypeEnabled  bool
+	domainEnabled     bool
+	usageTypeEnabled  bool
+	asnEnabled        bool
+	asEnabled         bool
+	lastSeenEnabled   bool
+	threatEnabled     bool
+	providerEnabled   bool
+	fraudScoreEnabled bool
 
 	metaOK bool
 }
 
 var defaultDB = &DB{}
 
-var countryPosition = [12]uint8{0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3}
-var regionPosition = [12]uint8{0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 4}
-var cityPosition = [12]uint8{0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 5, 5}
-var ispPosition = [12]uint8{0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6, 6}
-var proxyTypePosition = [12]uint8{0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}
-var domainPosition = [12]uint8{0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7}
-var usageTypePosition = [12]uint8{0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8}
-var asnPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9}
-var asPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10}
-var lastSeenPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11}
-var threatPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12}
-var providerPosition = [12]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13}
+var countryPosition = [13]uint8{0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3}
+var regionPosition = [13]uint8{0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4}
+var cityPosition = [13]uint8{0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5}
+var ispPosition = [13]uint8{0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6, 6, 6}
+var proxyTypePosition = [13]uint8{0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}
+var domainPosition = [13]uint8{0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7}
+var usageTypePosition = [13]uint8{0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8, 8}
+var asnPosition = [13]uint8{0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9, 9}
+var asPosition = [13]uint8{0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10, 10}
+var lastSeenPosition = [13]uint8{0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11, 11}
+var threatPosition = [13]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12, 12}
+var providerPosition = [13]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 13}
+var fraudScorePosition = [13]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14}
 
-const moduleVersion string = "4.0.1"
+const moduleVersion string = "4.1.0"
 
 var maxIPV4Range = uint128.From64(4294967295)
 var maxIPV6Range = uint128.From64(0)
@@ -139,8 +144,9 @@ const as uint32 = 0x00400
 const lastSeen uint32 = 0x00800
 const threat uint32 = 0x01000
 const provider uint32 = 0x02000
+const fraudScore uint32 = 0x04000
 
-const all uint32 = countryShort | countryLong | region | city | isp | proxyType | isProxy | domain | usageType | asn | as | lastSeen | threat | provider
+const all uint32 = countryShort | countryLong | region | city | isp | proxyType | isProxy | domain | usageType | asn | as | lastSeen | threat | provider | fraudScore
 
 const msgNotSupported string = "NOT SUPPORTED"
 const msgInvalidIP string = "INVALID IP ADDRESS"
@@ -446,6 +452,10 @@ func OpenDBWithReader(reader dbReader) (*DB, error) {
 		db.providerPositionOffset = uint32(providerPosition[dbt]-2) << 2
 		db.providerEnabled = true
 	}
+	if fraudScorePosition[dbt] != 0 {
+		db.fraudScorePositionOffset = uint32(fraudScorePosition[dbt]-2) << 2
+		db.fraudScoreEnabled = true
+	}
 
 	db.metaOK = true
 
@@ -484,6 +494,7 @@ func loadMessage(mesg string) IP2ProxyRecord {
 	x.LastSeen = mesg
 	x.Threat = mesg
 	x.Provider = mesg
+	x.FraudScore = mesg
 	x.IsProxy = -1
 
 	return x
@@ -584,6 +595,12 @@ func (d *DB) GetThreat(ipAddress string) (string, error) {
 func (d *DB) GetProvider(ipAddress string) (string, error) {
 	data, err := d.query(ipAddress, provider)
 	return data.Provider, err
+}
+
+// GetFraudScore will return the fraud score of the queried IP address.
+func (d *DB) GetFraudScore(ipAddress string) (string, error) {
+	data, err := d.query(ipAddress, fraudScore)
+	return data.FraudScore, err
 }
 
 // IsProxy checks whether the queried IP address was a proxy. Returned value: -1 (errors), 0 (not a proxy), 1 (a proxy), 2 (a data center IP address or search engine robot).
@@ -770,6 +787,12 @@ func (d *DB) query(ipAddress string, mode uint32) (IP2ProxyRecord, error) {
 
 			if mode&provider != 0 && d.providerEnabled {
 				if x.Provider, err = d.readStr(d.readUint32Row(row, d.providerPositionOffset)); err != nil {
+					return x, err
+				}
+			}
+
+			if mode&fraudScore != 0 && d.fraudScoreEnabled {
+				if x.FraudScore, err = d.readStr(d.readUint32Row(row, d.fraudScorePositionOffset)); err != nil {
 					return x, err
 				}
 			}

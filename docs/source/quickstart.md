@@ -34,7 +34,7 @@ import (
 )
 
 func main() {
-	db, err := ip2proxy.OpenDB("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.BIN")
+	db, err := ip2proxy.OpenDB("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER-FRAUDSCORE.BIN")
 	
 	if err != nil {
 		return
@@ -65,6 +65,7 @@ func main() {
 	fmt.Printf("LastSeen: %s\n", all.LastSeen);
 	fmt.Printf("Threat: %s\n", all.Threat)
 	fmt.Printf("Provider: %s\n", all.Provider)
+	fmt.Printf("FraudScore: %s\n", all.FraudScore)
 	
 	db.Close()
 }
