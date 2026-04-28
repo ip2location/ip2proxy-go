@@ -1,6 +1,6 @@
 // Package ip2proxy allows user to query an IP address if it was being used as
 // VPN anonymizer, open proxies, web proxies, Tor exits, data center,
-// web hosting (DCH) range, search engine robots (SES), residential (RES),
+// web hosting (DCH) range, search engine robots (SES), AI crawlers (AIC), residential (RES),
 // consumer privacy networks (CPN) and enterprise private networks (EPN)
 // by using the IP2Proxy database.
 package ip2proxy
@@ -118,7 +118,7 @@ var threatPosition = [13]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12, 12}
 var providerPosition = [13]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 13}
 var fraudScorePosition = [13]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14}
 
-const moduleVersion string = "4.1.0"
+const moduleVersion string = "4.2.0"
 
 var maxIPV4Range = uint128.From64(4294967295)
 var maxIPV6Range = uint128.From64(0)
@@ -800,7 +800,7 @@ func (d *DB) query(ipAddress string, mode uint32) (IP2ProxyRecord, error) {
 			if x.CountryShort == "-" || x.ProxyType == "-" {
 				x.IsProxy = 0
 			} else {
-				if x.ProxyType == "DCH" || x.ProxyType == "SES" {
+				if x.ProxyType == "DCH" || x.ProxyType == "SES" || x.ProxyType == "AIC" {
 					x.IsProxy = 2
 				} else {
 					x.IsProxy = 1

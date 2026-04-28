@@ -4,11 +4,11 @@
 # -- Project information
 
 project = 'IP2Proxy Go'
-copyright = '2025, IP2Location'
+copyright = '2026, IP2Location'
 author = 'IP2Location'
 
-release = '0.1.0'
-version = '0.1.0'
+release = '4.2.0'
+version = '4.2.0'
 
 # -- General configuration
 
