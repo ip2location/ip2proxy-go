@@ -1,4 +1,3 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/ip2location/ip2proxy-go/v4)](https://goreportcard.com/report/github.com/ip2location/ip2proxy-go/v4)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/ip2location/ip2proxy-go/v4)](https://pkg.go.dev/github.com/ip2location/ip2proxy-go/v4)
 
 # IP2Proxy Go Package
